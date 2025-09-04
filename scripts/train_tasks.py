@@ -357,33 +357,17 @@ def run_comprehensive_experiments(
     Returns:
         List of experiment results
     """
-    # Model configuration
-    if single_task:
-        # Single task mode: absolute minimum for fastest testing
-        model_config = {
-            "hidden_size": 8,  # Extremely small model
-            "num_layers": 1,  # Single layer
-            "num_heads": 1,  # Single head
-            "ff_size": 32,  # Very small feedforward
-            "max_seq_len": 6,  # Very short sequences
-            "batch_size": 4,  # Small batch
-            "dropout": 0.5,  # High dropout
-            "max_epochs": 50,  # More epochs to see grokking
-            "grokking_threshold": 0.95,  # Match paper threshold
-        }
-    else:
-        # Full mode: original configuration
-        model_config = {
-            "hidden_size": 128,
-            "num_layers": 4,
-            "num_heads": 8,
-            "ff_size": 512,
-            "max_seq_len": 10,
-            "batch_size": 32,
-            "dropout": 0.1,
-            "max_epochs": 300,
-            "grokking_threshold": 0.95,
-        }
+    model_config = {
+        "hidden_size": 8,  # Extremely small model
+        "num_layers": 1,  # Single layer
+        "num_heads": 1,  # Single head
+        "ff_size": 32,  # Very small feedforward
+        "max_seq_len": 6,  # Very short sequences
+        "batch_size": 4,  # Small batch
+        "dropout": 0.5,  # High dropout
+        "max_epochs": 50,  # More epochs to see grokking
+        "grokking_threshold": 0.95,  # Match paper threshold
+    }
 
     # Optimizer configurations - based on paper findings
     muon_config = {
