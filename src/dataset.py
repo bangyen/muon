@@ -1,5 +1,4 @@
 import random
-from typing import Dict, List, Tuple
 
 import numpy as np
 import torch
@@ -52,7 +51,7 @@ class ModularArithmeticDataset(Dataset):
         # Create vocabulary
         self._create_vocabulary()
 
-    def _generate_modular_data(self) -> List[Tuple[int, int, int]]:
+    def _generate_modular_data(self) -> list[tuple[int, int, int]]:
         """Generate data for modular arithmetic tasks"""
         data = []
 
@@ -93,7 +92,7 @@ class ModularArithmeticDataset(Dataset):
 
         return data
 
-    def _generate_parity_data(self) -> List[Tuple[int, int, int]]:
+    def _generate_parity_data(self) -> list[tuple[int, int, int]]:
         """Generate data for parity task (10-bit binary strings)"""
         data = []
         for i in range(1024):  # 2^10 = 1024 possible 10-bit strings
@@ -149,7 +148,7 @@ class ModularArithmeticDataset(Dataset):
         # Reverse mapping
         self.idx_to_token = {v: k for k, v in self.vocab.items()}
 
-    def _tokenize(self, a: int, b: int, result: int) -> List[int]:
+    def _tokenize(self, a: int, b: int, result: int) -> list[int]:
         """Convert arithmetic expression to token sequence"""
         if self.task_type == "parity":
             # For parity: [<bos>, number, <eos>] -> parity
@@ -207,7 +206,7 @@ class ModularArithmeticDataset(Dataset):
             "result": result,
         }
 
-    def get_val_data(self) -> List[Dict]:
+    def get_val_data(self) -> list[dict]:
         """Get validation data"""
         val_samples = []
         for a, b, result in self.val_data:
@@ -246,7 +245,7 @@ def create_dataloader(
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
 
-def get_task_configs() -> Dict[str, Dict]:
+def get_task_configs() -> dict[str, dict]:
     """Get task configurations as described in the paper"""
     return {
         "gcd": {"modulus": 97, "train_split": 0.5},

@@ -7,7 +7,6 @@ import argparse
 import json
 import os
 from datetime import datetime
-from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -32,7 +31,7 @@ class GrokkingTrainer:
         model: nn.Module,
         optimizer: optim.Optimizer,
         train_loader: DataLoader,
-        val_data: List[Dict],
+        val_data: list[dict],
         device: str = "cpu",
         softmax_variant: str = "standard",
     ):
@@ -70,7 +69,7 @@ class GrokkingTrainer:
             SoftmaxVariants, f"{softmax_variant}_softmax"
         )
 
-    def train_epoch(self) -> Tuple[float, float]:
+    def train_epoch(self) -> tuple[float, float]:
         """Train for one epoch"""
         self.model.train()
         total_loss = 0.0
@@ -154,7 +153,7 @@ class GrokkingTrainer:
         max_epochs: int = 500,
         grokking_threshold: float = 0.95,
         patience: int = 50,
-    ) -> Dict:
+    ) -> dict:
         """
         Train the model and track grokking
 
@@ -225,11 +224,11 @@ def run_experiment(
     task_type: str,
     optimizer_type: str,
     softmax_variant: str,
-    model_config: Dict,
-    optimizer_config: Dict,
+    model_config: dict,
+    optimizer_config: dict,
     device: str = "cpu",
     seed: int = 42,
-) -> Dict:
+) -> dict:
     """
     Run a single experiment
 
@@ -330,7 +329,7 @@ def run_experiment(
 
 def run_comprehensive_experiments(
     device: str = "cpu", num_runs: int = 3
-) -> List[Dict]:
+) -> list[dict]:
     """
     Run comprehensive experiments as described in the paper
 
@@ -419,7 +418,7 @@ def run_comprehensive_experiments(
     return all_results
 
 
-def save_results(results: List[Dict], output_dir: str = "results"):
+def save_results(results: list[dict], output_dir: str = "results"):
     """Save experiment results"""
     os.makedirs(output_dir, exist_ok=True)
 

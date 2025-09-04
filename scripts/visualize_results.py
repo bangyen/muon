@@ -6,7 +6,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import argparse
 import json
 import os
-from typing import Dict, List
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -114,7 +113,7 @@ def create_grokking_comparison_plot(
 
 
 def create_learning_curves_plot(
-    results: List[Dict], output_dir: str = "plots"
+    results: list[dict], output_dir: str = "plots"
 ):
     """
     Create learning curves showing training and validation accuracy over time
@@ -357,7 +356,7 @@ def create_summary_table(df: pd.DataFrame, output_dir: str = "plots"):
     return summary_df
 
 
-def load_results(results_file: str) -> List[Dict]:
+def load_results(results_file: str) -> list[dict]:
     """Load experiment results from JSON file"""
     with open(results_file) as f:
         results = json.load(f)
