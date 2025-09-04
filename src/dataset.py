@@ -1,4 +1,5 @@
 import random
+from dataclasses import dataclass
 from typing import Union
 
 import numpy as np
@@ -6,55 +7,62 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 
 
-class ModularArithmeticDataset(Dataset):
+@dataclass
+class DatasetConfig:
+    """Configuration for the ModularArithmeticDataset"""
+
+    task_type: str
+    modulus: int = 97
+    train_split: float = 0.5
+    max_seq_len: int = 5
+    seed: int = 42
+
+
+class ModularArithmeticDataset(Dataset[dict[str, Union[torch.Tensor, int]]]):
     """
     Dataset for modular arithmetic tasks as described in the paper
     Supports: addition, multiplication, division, exponentiation, GCD, and parity
     """
 
-    def __init__(
-        self,
-        task_type: str,
-        modulus: int = 97,
-        train_split: float = 0.5,
-        max_seq_len: int = 5,
-        seed: int = 42,
-    ) -> None:
+    def __init__(self, config: DatasetConfig) -> None:
         """
         Initialize modular arithmetic dataset
 
         Args:
-            task_type: Type of operation ('add', 'mul', 'div', 'exp', 'gcd', 'parity')
-            modulus: Modulus for modular arithmetic (default 97 as in paper)
-            train_split: Fraction of data for training
-            max_seq_len: Maximum sequence length
-            seed: Random seed for reproducibility
+            config: Dataset configuration
         """
-        if task_type not in ["add", "mul", "div", "exp", "gcd", "parity"]:
-            raise ValueError(f"Invalid task type: {task_type}")
+        if config.task_type not in [
+            "add",
+            "mul",
+            "div",
+            "exp",
+            "gcd",
+            "parity",
+        ]:
+            raise ValueError(f"Invalid task type: {config.task_type}")
 
-        if modulus <= 0:
-            raise ValueError(f"Modulus must be positive: {modulus}")
+        if config.modulus <= 0:
+            raise ValueError(f"Modulus must be positive: {config.modulus}")
 
         min_train_split = 0.0
         max_train_split = 1.0
-        if not min_train_split < train_split < max_train_split:
+        if not min_train_split < config.train_split < max_train_split:
             raise ValueError(
-                f"Train split must be between 0 and 1: {train_split}"
+                f"Train split must be between 0 and 1: {config.train_split}"
             )
 
-        self.task_type = task_type
-        self.modulus = modulus
-        self.train_split = train_split
-        self.max_seq_len = max_seq_len
-        self.seed = seed
+        self.task_type = config.task_type
+        self.modulus = config.modulus
+        self.train_split = config.train_split
+        self.max_seq_len = config.max_seq_len
+        self.seed = config.seed
 
         # Set random seed
-        random.seed(seed)
-        np.random.seed(seed)
+        random.seed(config.seed)
+        np.random.seed(config.seed)
 
         # Generate data based on task type
-        if task_type == "parity":
+        if config.task_type == "parity":
             self.data = self._generate_parity_data()
         else:
             self.data = self._generate_modular_data()
@@ -199,7 +207,7 @@ class ModularArithmeticDataset(Dataset):
     def __len__(self) -> int:
         return len(self.train_data)
 
-    def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
+    def __getitem__(self, idx: int) -> dict[str, Union[torch.Tensor, int]]:
         a, b, result = self.train_data[idx]
 
         # Tokenize input sequence
@@ -226,9 +234,9 @@ class ModularArithmeticDataset(Dataset):
             "result": result,
         }
 
-    def get_val_data(self) -> list[dict[str, torch.Tensor]]:
+    def get_val_data(self) -> list[dict[str, Union[torch.Tensor, int]]]:
         """Get validation data"""
-        val_samples = []
+        val_samples: list[dict[str, Union[torch.Tensor, int]]] = []
         for a, b, result in self.val_data:
             input_tokens = self._tokenize(a, b, result)
             target_tokens = input_tokens[1:] + [self.vocab["<pad>"]]
@@ -260,7 +268,7 @@ def create_dataloader(
     dataset: ModularArithmeticDataset,
     batch_size: int = 32,
     shuffle: bool = True,
-) -> DataLoader:
+) -> DataLoader[dict[str, Union[torch.Tensor, int]]]:
     """Create DataLoader for the dataset"""
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 

@@ -1,9 +1,24 @@
 import math
+from dataclasses import dataclass
 from typing import Optional
 
 import torch
 import torch.nn.functional as F
 from torch import nn
+
+
+@dataclass
+class ModelConfig:
+    """Configuration for the GrokkingTransformer"""
+
+    vocab_size: int
+    hidden_size: int = 128
+    num_layers: int = 4
+    num_heads: int = 8
+    ff_size: int = 512
+    max_seq_len: int = 512
+    dropout: float = 0.1
+    softmax_variant: str = "standard"
 
 
 class RMSNorm(nn.Module):
@@ -35,7 +50,7 @@ class RotaryPositionalEmbedding(nn.Module):
         if seq_len is None:
             seq_len = x.shape[1]
 
-        t = torch.arange(seq_len, device=x.device).type_as(self.inv_freq)
+        t = torch.arange(seq_len, device=x.device, dtype=torch.float32)
         freqs = torch.einsum("i,j->ij", t, self.inv_freq)
         cos = torch.cos(freqs)
         sin = torch.sin(freqs)
@@ -177,43 +192,42 @@ class GrokkingTransformer(nn.Module):
     Based on the architecture described in the paper
     """
 
-    def __init__(
-        self,
-        vocab_size: int,
-        hidden_size: int = 128,
-        num_layers: int = 4,
-        num_heads: int = 8,
-        ff_size: int = 512,
-        max_seq_len: int = 512,
-        dropout: float = 0.1,
-        softmax_variant: str = "standard",
-    ) -> None:
+    def __init__(self, config: ModelConfig) -> None:
         super().__init__()
-        self.hidden_size = hidden_size
-        self.vocab_size = vocab_size
-        self.softmax_variant = softmax_variant
+        self.hidden_size = config.hidden_size
+        self.vocab_size = config.vocab_size
+        self.softmax_variant = config.softmax_variant
 
         # Embedding layer (identity embeddings as mentioned in paper)
-        self.embedding = nn.Embedding(vocab_size, hidden_size, padding_idx=0)
+        self.embedding = nn.Embedding(
+            config.vocab_size, config.hidden_size, padding_idx=0
+        )
 
         # Positional encoding
         self.pos_embed = nn.Parameter(
-            torch.randn(1, max_seq_len, hidden_size) * 0.02
+            torch.randn(1, config.max_seq_len, config.hidden_size) * 0.02
         )
 
         # Transformer blocks
         self.blocks = nn.ModuleList(
             [
-                TransformerBlock(hidden_size, num_heads, ff_size, dropout)
-                for _ in range(num_layers)
+                TransformerBlock(
+                    config.hidden_size,
+                    config.num_heads,
+                    config.ff_size,
+                    config.dropout,
+                )
+                for _ in range(config.num_layers)
             ]
         )
 
         # Final layer norm
-        self.norm = RMSNorm(hidden_size)
+        self.norm = RMSNorm(config.hidden_size)
 
         # Output projection
-        self.output = nn.Linear(hidden_size, vocab_size, bias=False)
+        self.output = nn.Linear(
+            config.hidden_size, config.vocab_size, bias=False
+        )
 
         # Initialize weights
         self.apply(self._init_weights)

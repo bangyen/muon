@@ -1,8 +1,22 @@
 import math
-from typing import Union
+from dataclasses import dataclass
+from typing import Callable, Optional, Union
 
 import torch
 from torch.optim import Optimizer
+
+
+@dataclass
+class OptimizerConfig:
+    """Configuration for the MuonOptimizer"""
+
+    lr: float = 1e-3
+    betas: tuple[float, float] = (0.9, 0.98)
+    eps: float = 1e-8
+    weight_decay: float = 1e-2
+    spectral_norm_strength: float = 0.1
+    second_order_interval: int = 10
+    use_orthogonal_updates: bool = True
 
 
 class MuonOptimizer(Optimizer):
@@ -18,55 +32,51 @@ class MuonOptimizer(Optimizer):
 
     def __init__(
         self,
-        params,
-        lr: float = 1e-3,
-        betas: tuple = (0.9, 0.98),
-        eps: float = 1e-8,
-        weight_decay: float = 1e-2,
-        spectral_norm_strength: float = 0.1,
-        second_order_interval: int = 10,
-        use_orthogonal_updates: bool = True,
+        params: Union[torch.Tensor, list[torch.Tensor]],
+        config: OptimizerConfig,
     ) -> None:
         """
         Initialize Muon optimizer
 
         Args:
             params: Model parameters
-            lr: Learning rate
-            betas: Beta parameters for momentum
-            eps: Epsilon for numerical stability
-            weight_decay: Weight decay strength
-            spectral_norm_strength: Strength of spectral norm constraints
-            second_order_interval: How often to compute second-order info
-            use_orthogonal_updates: Whether to use orthogonalized gradients
+            config: Optimizer configuration
         """
         min_value = 0.0
         max_beta = 1.0
-        if not lr >= min_value:
-            raise ValueError(f"Invalid learning rate: {lr}")
-        if not eps >= min_value:
-            raise ValueError(f"Invalid epsilon value: {eps}")
-        if not min_value <= betas[0] < max_beta:
-            raise ValueError(f"Invalid beta parameter at index 0: {betas[0]}")
-        if not min_value <= betas[1] < max_beta:
-            raise ValueError(f"Invalid beta parameter at index 1: {betas[1]}")
-        if not weight_decay >= min_value:
-            raise ValueError(f"Invalid weight_decay value: {weight_decay}")
+        if not config.lr >= min_value:
+            raise ValueError(f"Invalid learning rate: {config.lr}")
+        if not config.eps >= min_value:
+            raise ValueError(f"Invalid epsilon value: {config.eps}")
+        if not min_value <= config.betas[0] < max_beta:
+            raise ValueError(
+                f"Invalid beta parameter at index 0: {config.betas[0]}"
+            )
+        if not min_value <= config.betas[1] < max_beta:
+            raise ValueError(
+                f"Invalid beta parameter at index 1: {config.betas[1]}"
+            )
+        if not config.weight_decay >= min_value:
+            raise ValueError(
+                f"Invalid weight_decay value: {config.weight_decay}"
+            )
 
         defaults = dict(
-            lr=lr,
-            betas=betas,
-            eps=eps,
-            weight_decay=weight_decay,
-            spectral_norm_strength=spectral_norm_strength,
-            second_order_interval=second_order_interval,
-            use_orthogonal_updates=use_orthogonal_updates,
+            lr=config.lr,
+            betas=config.betas,
+            eps=config.eps,
+            weight_decay=config.weight_decay,
+            spectral_norm_strength=config.spectral_norm_strength,
+            second_order_interval=config.second_order_interval,
+            use_orthogonal_updates=config.use_orthogonal_updates,
         )
         super().__init__(params, defaults)
 
         self.step_count = 0
 
-    def step(self, closure=None) -> Union[float, None]:
+    def step(
+        self, closure: Optional[Callable[[], float]] = None
+    ) -> Optional[float]:
         """Performs a single optimization step"""
         loss = None
         if closure is not None:

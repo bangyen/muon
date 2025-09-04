@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import sys
+from dataclasses import dataclass
 from datetime import datetime
 
 import numpy as np
@@ -11,12 +12,28 @@ from torch import nn, optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from src.dataset import (
+    DatasetConfig,
+    ModularArithmeticDataset,
+    get_task_configs,
+)
+from src.model import GrokkingTransformer, ModelConfig, SoftmaxVariants
+from src.optimizer import MuonOptimizer, OptimizerConfig
+
 # Add src to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.dataset import ModularArithmeticDataset, get_task_configs
-from src.model import GrokkingTransformer, SoftmaxVariants
-from src.optimizer import MuonOptimizer
+
+@dataclass
+class TrainerConfig:
+    """Configuration for the GrokkingTrainer"""
+
+    model: nn.Module
+    optimizer: optim.Optimizer
+    train_loader: DataLoader
+    val_data: list[dict]
+    device: str = "cpu"
+    softmax_variant: str = "standard"
 
 
 class GrokkingTrainer:
@@ -25,32 +42,19 @@ class GrokkingTrainer:
     Implements the training loop and evaluation as described in the paper
     """
 
-    def __init__(
-        self,
-        model: nn.Module,
-        optimizer: optim.Optimizer,
-        train_loader: DataLoader,
-        val_data: list[dict],
-        device: str = "cpu",
-        softmax_variant: str = "standard",
-    ):
+    def __init__(self, config: TrainerConfig):
         """
         Initialize trainer
 
         Args:
-            model: Transformer model
-            optimizer: Optimizer (Muon or AdamW)
-            train_loader: Training data loader
-            val_data: Validation data
-            device: Device to run on
-            softmax_variant: Type of softmax ('standard', 'stablemax', 'sparsemax')
+            config: Trainer configuration containing all required components
         """
-        self.model = model.to(device)
-        self.optimizer = optimizer
-        self.train_loader = train_loader
-        self.val_data = val_data
-        self.device = device
-        self.softmax_variant = softmax_variant
+        self.model = config.model.to(config.device)
+        self.optimizer = config.optimizer
+        self.train_loader = config.train_loader
+        self.val_data = config.val_data
+        self.device = config.device
+        self.softmax_variant = config.softmax_variant
 
         # Loss function
         self.criterion = nn.CrossEntropyLoss(
@@ -65,7 +69,7 @@ class GrokkingTrainer:
 
         # Softmax function
         self.softmax_fn = getattr(
-            SoftmaxVariants, f"{softmax_variant}_softmax"
+            SoftmaxVariants, f"{config.softmax_variant}_softmax"
         )
 
     def train_epoch(self) -> tuple[float, float]:
@@ -215,107 +219,118 @@ class GrokkingTrainer:
         }
 
 
-def run_experiment(
-    task_type: str,
-    optimizer_type: str,
-    softmax_variant: str,
-    model_config: dict,
-    optimizer_config: dict,
-    device: str = "cpu",
-    seed: int = 42,
-) -> dict:
+@dataclass
+class ExperimentConfig:
+    """Configuration for running experiments"""
+
+    task_type: str
+    optimizer_type: str
+    softmax_variant: str
+    model_config: dict
+    optimizer_config: dict
+    device: str = "cpu"
+    seed: int = 42
+
+
+def run_experiment(config: ExperimentConfig) -> dict:
     """
     Run a single experiment
 
     Args:
-        task_type: Type of arithmetic task
-        optimizer_type: 'muon' or 'adamw'
-        softmax_variant: Type of softmax
-        model_config: Model hyperparameters
-        optimizer_config: Optimizer hyperparameters
-        device: Device to run on
-        seed: Random seed
+        config: Experiment configuration
 
     Returns:
         Experiment results
     """
     # Set random seeds
-    torch.manual_seed(seed)
-    np.random.seed(seed)
+    torch.manual_seed(config.seed)
+    np.random.seed(config.seed)
 
     # Get task configuration
     task_configs = get_task_configs()
-    task_config = task_configs[task_type]
+    task_config = task_configs[config.task_type]
 
     # Create dataset
     dataset = ModularArithmeticDataset(
-        task_type=task_type,
-        modulus=task_config["modulus"],
-        train_split=task_config["train_split"],
-        max_seq_len=model_config["max_seq_len"],
-        seed=seed,
+        DatasetConfig(
+            task_type=config.task_type,
+            modulus=task_config["modulus"],
+            train_split=task_config["train_split"],
+            max_seq_len=config.model_config["max_seq_len"],
+            seed=config.seed,
+        )
     )
 
     # Create data loader
     train_loader = DataLoader(
-        dataset, batch_size=model_config["batch_size"], shuffle=True
+        dataset, batch_size=config.model_config["batch_size"], shuffle=True
     )
     val_data = dataset.get_val_data()
 
     # Create model
     model = GrokkingTransformer(
-        vocab_size=dataset.vocab_size,
-        hidden_size=model_config["hidden_size"],
-        num_layers=model_config["num_layers"],
-        num_heads=model_config["num_heads"],
-        ff_size=model_config["ff_size"],
-        max_seq_len=model_config["max_seq_len"],
-        dropout=model_config["dropout"],
+        ModelConfig(
+            vocab_size=dataset.vocab_size,
+            hidden_size=config.model_config["hidden_size"],
+            num_layers=config.model_config["num_layers"],
+            num_heads=config.model_config["num_heads"],
+            ff_size=config.model_config["ff_size"],
+            max_seq_len=config.model_config["max_seq_len"],
+            dropout=config.model_config["dropout"],
+        )
     )
 
     # Create optimizer
-    if optimizer_type == "muon":
+    if config.optimizer_type == "muon":
         optimizer = MuonOptimizer(
             model.parameters(),
-            lr=optimizer_config["lr"],
-            betas=optimizer_config["betas"],
-            weight_decay=optimizer_config["weight_decay"],
-            spectral_norm_strength=optimizer_config["spectral_norm_strength"],
-            second_order_interval=optimizer_config["second_order_interval"],
+            OptimizerConfig(
+                lr=config.optimizer_config["lr"],
+                betas=config.optimizer_config["betas"],
+                weight_decay=config.optimizer_config["weight_decay"],
+                spectral_norm_strength=config.optimizer_config[
+                    "spectral_norm_strength"
+                ],
+                second_order_interval=config.optimizer_config[
+                    "second_order_interval"
+                ],
+            ),
         )
     else:  # AdamW
         optimizer = optim.AdamW(
             model.parameters(),
-            lr=optimizer_config["lr"],
-            betas=optimizer_config["betas"],
-            weight_decay=optimizer_config["weight_decay"],
+            lr=config.optimizer_config["lr"],
+            betas=config.optimizer_config["betas"],
+            weight_decay=config.optimizer_config["weight_decay"],
         )
 
     # Create trainer
     trainer = GrokkingTrainer(
-        model=model,
-        optimizer=optimizer,
-        train_loader=train_loader,
-        val_data=val_data,
-        device=device,
-        softmax_variant=softmax_variant,
+        TrainerConfig(
+            model=model,
+            optimizer=optimizer,
+            train_loader=train_loader,
+            val_data=val_data,
+            device=config.device,
+            softmax_variant=config.softmax_variant,
+        )
     )
 
     # Train
     results = trainer.train(
-        max_epochs=model_config["max_epochs"],
-        grokking_threshold=model_config["grokking_threshold"],
+        max_epochs=config.model_config["max_epochs"],
+        grokking_threshold=config.model_config["grokking_threshold"],
     )
 
     # Add metadata
     results.update(
         {
-            "task_type": task_type,
-            "optimizer_type": optimizer_type,
-            "softmax_variant": softmax_variant,
-            "model_config": model_config,
-            "optimizer_config": optimizer_config,
-            "seed": seed,
+            "task_type": config.task_type,
+            "optimizer_type": config.optimizer_type,
+            "softmax_variant": config.softmax_variant,
+            "model_config": config.model_config,
+            "optimizer_config": config.optimizer_config,
+            "seed": config.seed,
         }
     )
 
@@ -389,13 +404,15 @@ def run_comprehensive_experiments(
 
                     # Run experiment
                     results = run_experiment(
-                        task_type=task_type,
-                        optimizer_type=optimizer_type,
-                        softmax_variant=softmax_variant,
-                        model_config=model_config,
-                        optimizer_config=optimizer_config,
-                        device=device,
-                        seed=42 + run,
+                        ExperimentConfig(
+                            task_type=task_type,
+                            optimizer_type=optimizer_type,
+                            softmax_variant=softmax_variant,
+                            model_config=model_config,
+                            optimizer_config=optimizer_config,
+                            device=device,
+                            seed=42 + run,
+                        )
                     )
 
                     all_results.append(results)
