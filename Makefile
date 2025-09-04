@@ -14,20 +14,20 @@ install-dev: ## Install development dependencies
 	pip install -e ".[dev]"
 
 test: ## Run tests
-	python test_implementation.py
+	python -m pytest tests/ -v
 
 test-fast: ## Run quick test experiments
 	python scripts/train_tasks.py --quick_test --device cpu
 
 lint: ## Run linting checks
-	ruff check src/ scripts/ test_implementation.py
-	ruff format --check src/ scripts/ test_implementation.py
+	ruff check src/ scripts/
+	ruff format --check src/ scripts/
 	mypy src/
 	interrogate src/ --fail-under=90
 
 format: ## Format code with ruff
-	ruff format src/ scripts/ test_implementation.py
-	ruff check --fix src/ scripts/ test_implementation.py
+	ruff format src/ scripts/
+	ruff check --fix src/ scripts/
 
 clean: ## Clean up generated files
 	rm -rf htmlcov/
