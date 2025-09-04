@@ -13,7 +13,7 @@ tests/
 ├── test_dataset.py         # Dataset and data loading tests
 ├── test_grokking.py        # Grokking detection and analysis tests
 ├── test_integration.py     # End-to-end integration tests
-└── run_tests.py            # Test runner script
+└── README.md              # This documentation
 ```
 
 ## Test Categories
@@ -70,31 +70,31 @@ pip install pytest pytest-cov
 ### Basic Test Execution
 ```bash
 # Run all tests
-python tests/run_tests.py
+pytest tests/ -v
 
 # Run with verbose output
-python tests/run_tests.py --verbose
+pytest tests/ -v
 
 # Run with coverage report
-python tests/run_tests.py --coverage
+pytest tests/ --cov=src --cov-report=html --cov-report=term
 ```
 
 ### Specific Test Suites
 ```bash
 # Run only optimizer tests
-python tests/run_tests.py --suite optimizer
+pytest tests/test_optimizer.py -v
 
 # Run only model tests
-python tests/run_tests.py --suite model
+pytest tests/test_model.py -v
 
 # Run only dataset tests
-python tests/run_tests.py --suite dataset
+pytest tests/test_dataset.py -v
 
 # Run only grokking tests
-python tests/run_tests.py --suite grokking
+pytest tests/test_grokking.py -v
 
 # Run only integration tests
-python tests/run_tests.py --suite integration
+pytest tests/test_integration.py -v
 ```
 
 ### Using pytest directly
