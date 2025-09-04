@@ -1,6 +1,6 @@
 import random
 from dataclasses import dataclass
-from typing import Union
+from typing import Any, Union
 
 import numpy as np
 import torch
@@ -24,13 +24,29 @@ class ModularArithmeticDataset(Dataset[dict[str, Union[torch.Tensor, int]]]):
     Supports: addition, multiplication, division, exponentiation, GCD, and parity
     """
 
-    def __init__(self, config: DatasetConfig) -> None:
+    def __init__(
+        self, task_type: Union[str, DatasetConfig], **kwargs: Any
+    ) -> None:
         """
         Initialize modular arithmetic dataset
 
         Args:
-            config: Dataset configuration
+            task_type: Task type or DatasetConfig object
+            **kwargs: Additional configuration parameters
         """
+        # Handle both config object and individual parameters
+        if isinstance(task_type, DatasetConfig):
+            config = task_type
+        else:
+            # Extract parameters from kwargs
+            config = DatasetConfig(
+                task_type=task_type,
+                modulus=kwargs.get("modulus", 97),
+                train_split=kwargs.get("train_split", 0.5),
+                max_seq_len=kwargs.get("max_seq_len", 5),
+                seed=kwargs.get("seed", 42),
+            )
+
         if config.task_type not in [
             "add",
             "mul",

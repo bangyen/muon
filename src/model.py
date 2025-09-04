@@ -1,6 +1,6 @@
 import math
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional, Union
 
 import torch
 import torch.nn.functional as F
@@ -298,47 +298,72 @@ class GrokkingTransformer(nn.Module):
     Based on the architecture described in the paper
     """
 
-    def __init__(self, config: ModelConfig) -> None:
+    def __init__(
+        self,
+        config: Optional[Union[ModelConfig, dict[str, Any]]] = None,
+        **kwargs: Any,
+    ) -> None:
         """
         Initialize GrokkingTransformer
 
         Args:
-            config: Model configuration
+            config: Model configuration object or dict (optional)
+            **kwargs: Configuration parameters
         """
         super().__init__()
-        self.hidden_size = config.hidden_size
-        self.vocab_size = config.vocab_size
-        self.softmax_variant = config.softmax_variant
+
+        # Handle both config object and individual parameters
+        if isinstance(config, ModelConfig):
+            model_config = config
+        elif isinstance(config, dict):
+            model_config = ModelConfig(**config)
+        else:
+            # Extract parameters from kwargs
+            model_config = ModelConfig(
+                vocab_size=kwargs.get("vocab_size", 128),
+                hidden_size=kwargs.get("hidden_size", 128),
+                num_layers=kwargs.get("num_layers", 4),
+                num_heads=kwargs.get("num_heads", 8),
+                ff_size=kwargs.get("ff_size", 512),
+                max_seq_len=kwargs.get("max_seq_len", 512),
+                dropout=kwargs.get("dropout", 0.1),
+                softmax_variant=kwargs.get("softmax_variant", "standard"),
+            )
+
+        self.hidden_size = model_config.hidden_size
+        self.vocab_size = model_config.vocab_size
+        self.softmax_variant = model_config.softmax_variant
 
         # Embedding layer (identity embeddings as mentioned in paper)
         self.embedding = nn.Embedding(
-            config.vocab_size, config.hidden_size, padding_idx=0
+            model_config.vocab_size, model_config.hidden_size, padding_idx=0
         )
 
         # Positional encoding
         self.pos_embed = nn.Parameter(
-            torch.randn(1, config.max_seq_len, config.hidden_size) * 0.02
+            torch.randn(1, model_config.max_seq_len, model_config.hidden_size)
+            * 0.02
         )
 
         # Transformer blocks
         self.blocks = nn.ModuleList(
             [
                 TransformerBlock(
-                    config.hidden_size,
-                    config.num_heads,
-                    config.ff_size,
-                    config.dropout,
+                    model_config.hidden_size,
+                    model_config.num_heads,
+                    model_config.ff_size,
+                    model_config.dropout,
                 )
-                for _ in range(config.num_layers)
+                for _ in range(model_config.num_layers)
             ]
         )
 
         # Final layer norm
-        self.norm = RMSNorm(config.hidden_size)
+        self.norm = RMSNorm(model_config.hidden_size)
 
         # Output projection
         self.output = nn.Linear(
-            config.hidden_size, config.vocab_size, bias=False
+            model_config.hidden_size, model_config.vocab_size, bias=False
         )
 
         # Initialize weights

@@ -1,6 +1,6 @@
 import math
 from dataclasses import dataclass
-from typing import Callable, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 import torch
 from torch.optim import Optimizer
@@ -33,42 +33,65 @@ class MuonOptimizer(Optimizer):
     def __init__(
         self,
         params: Union[torch.Tensor, list[torch.Tensor]],
-        config: OptimizerConfig,
+        config: Optional[Union[OptimizerConfig, dict[str, Any]]] = None,
+        **kwargs: Any,
     ) -> None:
         """
         Initialize Muon optimizer
 
         Args:
             params: Model parameters
-            config: Optimizer configuration
+            config: Optimizer configuration object or dict
+            **kwargs: Additional configuration parameters
         """
+        # Handle both config object and individual parameters
+        if isinstance(config, OptimizerConfig):
+            optimizer_config = config
+        elif isinstance(config, dict):
+            optimizer_config = OptimizerConfig(**config)
+        else:
+            # Extract parameters from kwargs
+            optimizer_config = OptimizerConfig(
+                lr=kwargs.get("lr", 1e-3),
+                betas=kwargs.get("betas", (0.9, 0.98)),
+                eps=kwargs.get("eps", 1e-8),
+                weight_decay=kwargs.get("weight_decay", 1e-2),
+                spectral_norm_strength=kwargs.get(
+                    "spectral_norm_strength", 0.1
+                ),
+                second_order_interval=kwargs.get("second_order_interval", 10),
+                use_orthogonal_updates=kwargs.get(
+                    "use_orthogonal_updates", True
+                ),
+            )
+
         min_value = 0.0
         max_beta = 1.0
-        if not config.lr >= min_value:
-            raise ValueError(f"Invalid learning rate: {config.lr}")
-        if not config.eps >= min_value:
-            raise ValueError(f"Invalid epsilon value: {config.eps}")
-        if not min_value <= config.betas[0] < max_beta:
+        if not optimizer_config.lr >= min_value:
+            raise ValueError(f"Invalid learning rate: {optimizer_config.lr}")
+        if not optimizer_config.eps >= min_value:
+            raise ValueError(f"Invalid epsilon value: {optimizer_config.eps}")
+        if not min_value <= optimizer_config.betas[0] < max_beta:
             raise ValueError(
-                f"Invalid beta parameter at index 0: {config.betas[0]}"
+                f"Invalid beta parameter at index 0: {optimizer_config.betas[0]}"
             )
-        if not min_value <= config.betas[1] < max_beta:
+        if not min_value <= optimizer_config.betas[1] < max_beta:
             raise ValueError(
-                f"Invalid beta parameter at index 1: {config.betas[1]}"
+                f"Invalid beta parameter at index 1: {optimizer_config.betas[1]}"
             )
-        if not config.weight_decay >= min_value:
+        if not optimizer_config.weight_decay >= min_value:
             raise ValueError(
-                f"Invalid weight_decay value: {config.weight_decay}"
+                f"Invalid weight_decay value: {optimizer_config.weight_decay}"
             )
 
         defaults = dict(
-            lr=config.lr,
-            betas=config.betas,
-            eps=config.eps,
-            weight_decay=config.weight_decay,
-            spectral_norm_strength=config.spectral_norm_strength,
-            second_order_interval=config.second_order_interval,
-            use_orthogonal_updates=config.use_orthogonal_updates,
+            lr=optimizer_config.lr,
+            betas=optimizer_config.betas,
+            eps=optimizer_config.eps,
+            weight_decay=optimizer_config.weight_decay,
+            spectral_norm_strength=optimizer_config.spectral_norm_strength,
+            second_order_interval=optimizer_config.second_order_interval,
+            use_orthogonal_updates=optimizer_config.use_orthogonal_updates,
         )
         super().__init__(params, defaults)
 
