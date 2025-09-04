@@ -52,7 +52,7 @@ class TestModularArithmeticDataset:
         test_cases = [
             ("add", 9409),  # 97 * 97 = 9409
             ("mul", 9409),
-            ("div", 9409),
+            ("div", 9312),  # Some numbers don't have multiplicative inverses
             ("exp", 9409),
             ("gcd", 9409),
             ("parity", 1024),  # 2^10 = 1024
@@ -70,7 +70,12 @@ class TestModularArithmeticDataset:
             for item in dataset.data[:10]:  # Check first 10 items
                 assert len(item) == 3  # (a, b, result)
                 assert all(isinstance(x, int) for x in item)
-                assert all(0 <= x < modulus for x in item[:2])  # inputs
+                if task_type == "parity":
+                    # For parity, first input can be up to 1023 (10-bit number)
+                    assert 0 <= item[0] < 1024  # 10-bit number
+                    assert 0 <= item[1] < modulus  # second input
+                else:
+                    assert all(0 <= x < modulus for x in item[:2])  # inputs
                 assert 0 <= item[2] < modulus  # output
 
     def test_train_val_split(self):
@@ -104,7 +109,7 @@ class TestModularArithmeticDataset:
         assert dataset.vocab_size > 0
 
         # Check that vocabulary contains necessary tokens
-        assert 0 in dataset.token_to_id  # padding token
+        assert "<pad>" in dataset.token_to_id  # padding token
         assert "=" in dataset.token_to_id  # equals token
         assert "mod" in dataset.token_to_id  # modulo token
 
@@ -181,9 +186,9 @@ class TestModularArithmeticDataset:
             # Test first 100 samples
             for i, (a, b, result) in enumerate(dataset.data[:100]):
                 expected = expected_func(a, b)
-                assert (
-                    result == expected
-                ), f"Task {task_type}: {a} op {b} = {result}, expected {expected}"
+                assert result == expected, (
+                    f"Task {task_type}: {a} op {b} = {result}, expected {expected}"
+                )
 
     def test_parity_task(self):
         """Test parity task specifically"""
@@ -195,13 +200,13 @@ class TestModularArithmeticDataset:
         assert len(dataset.data) == 1024  # 2^10
 
         # Test that parity is calculated correctly
-        for i, (binary_str, _, parity) in enumerate(dataset.data[:100]):
-            # Convert binary string to integer
-            num = int(binary_str, 2)
-            expected_parity = bin(num).count("1") % 2
-            assert (
-                parity == expected_parity
-            ), f"Parity mismatch for {binary_str}"
+        for i, (num, _, parity) in enumerate(dataset.data[:100]):
+            # Convert number to binary string and count 1s
+            binary_str = format(num, "010b")
+            expected_parity = sum(int(bit) for bit in binary_str) % 2
+            assert parity == expected_parity, (
+                f"Parity mismatch for {num} (binary: {binary_str})"
+            )
 
     def test_gcd_task(self):
         """Test GCD task specifically"""
@@ -212,9 +217,9 @@ class TestModularArithmeticDataset:
         # Test that GCD is calculated correctly
         for i, (a, b, result) in enumerate(dataset.data[:100]):
             expected_gcd = dataset._gcd(a, b)
-            assert (
-                result == expected_gcd
-            ), f"GCD mismatch: gcd({a}, {b}) = {result}, expected {expected_gcd}"
+            assert result == expected_gcd, (
+                f"GCD mismatch: gcd({a}, {b}) = {result}, expected {expected_gcd}"
+            )
 
     def test_division_task(self):
         """Test division task specifically"""
@@ -227,9 +232,9 @@ class TestModularArithmeticDataset:
             if b != 0:
                 # Check that result * b ≡ a (mod modulus)
                 check_result = (result * b) % dataset.modulus
-                assert (
-                    check_result == a
-                ), f"Division check failed: {result} * {b} ≡ {check_result} (mod {dataset.modulus}), expected {a}"
+                assert check_result == a, (
+                    f"Division check failed: {result} * {b} ≡ {check_result} (mod {dataset.modulus}), expected {a}"
+                )
 
     def test_sequence_length_handling(self):
         """Test handling of different sequence lengths"""
@@ -264,7 +269,7 @@ class TestModularArithmeticDataset:
 
         # Check that vocabulary is identical
         assert dataset1.token_to_id == dataset2.token_to_id
-        assert dataset1.id_to_token == dataset2.id_to_token
+        assert dataset1.idx_to_token == dataset2.idx_to_token
 
     def test_different_seeds(self):
         """Test that different seeds produce different data"""
@@ -386,4 +391,4 @@ class TestDatasetIntegration:
 
         # Check that training step completed successfully
         assert loss.item() > 0
-        assert torch.isfinite(loss.item())
+        assert torch.isfinite(loss)

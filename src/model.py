@@ -1,4 +1,5 @@
 import math
+from typing import Optional, Tuple
 
 import torch
 import torch.nn.functional as F
@@ -8,12 +9,12 @@ from torch import nn
 class RMSNorm(nn.Module):
     """RMS Normalization as used in the paper"""
 
-    def __init__(self, hidden_size, eps=1e-6):
+    def __init__(self, hidden_size: int, eps: float = 1e-6) -> None:
         super().__init__()
         self.eps = eps
         self.weight = nn.Parameter(torch.ones(hidden_size))
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Calculate RMS
         rms = torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)
         return x * rms * self.weight
@@ -22,13 +23,13 @@ class RMSNorm(nn.Module):
 class RotaryPositionalEmbedding(nn.Module):
     """Rotary Positional Embeddings (RoPE)"""
 
-    def __init__(self, dim, max_seq_len=512):
+    def __init__(self, dim: int, max_seq_len: int = 512) -> None:
         super().__init__()
         inv_freq = 1.0 / (10000 ** (torch.arange(0, dim, 2).float() / dim))
         self.register_buffer("inv_freq", inv_freq)
         self.max_seq_len = max_seq_len
 
-    def forward(self, x, seq_len=None):
+    def forward(self, x: torch.Tensor, seq_len: Optional[int] = None) -> Tuple[torch.Tensor, torch.Tensor]:
         if seq_len is None:
             seq_len = x.shape[1]
 
@@ -44,14 +45,14 @@ class RotaryPositionalEmbedding(nn.Module):
         return cos, sin
 
 
-def rotate_half(x):
+def rotate_half(x: torch.Tensor) -> torch.Tensor:
     """Rotate half the hidden dims of the input"""
     x1 = x[..., : x.shape[-1] // 2]
     x2 = x[..., x.shape[-1] // 2 :]
     return torch.cat((-x2, x1), dim=-1)
 
 
-def apply_rotary_pos_emb(q, k, cos, sin):
+def apply_rotary_pos_emb(q: torch.Tensor, k: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
     """Apply rotary positional embeddings to query and key"""
     # q, k: [batch, heads, seq_len, head_dim]
     # cos, sin: [1, 1, seq_len, head_dim//2]
@@ -74,7 +75,7 @@ def apply_rotary_pos_emb(q, k, cos, sin):
 class MultiHeadAttention(nn.Module):
     """Multi-head self-attention with RoPE"""
 
-    def __init__(self, hidden_size, num_heads, dropout=0.1):
+    def __init__(self, hidden_size: int, num_heads: int, dropout: float = 0.1) -> None:
         super().__init__()
         self.hidden_size = hidden_size
         self.num_heads = num_heads
@@ -86,18 +87,18 @@ class MultiHeadAttention(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.rope = RotaryPositionalEmbedding(self.head_dim)
 
-    def forward(self, x, mask=None):
-        B, T, C = x.shape
+    def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+        batch_size, seq_len, hidden_size = x.shape
         qkv = self.qkv(x).chunk(3, dim=-1)
         q, k, v = map(
-            lambda t: t.view(B, T, self.num_heads, self.head_dim).transpose(
+            lambda t: t.view(batch_size, seq_len, self.num_heads, self.head_dim).transpose(
                 1, 2
             ),
             qkv,
         )
 
         # Apply RoPE
-        rope_emb = self.rope(x, T)
+        rope_emb = self.rope(x, seq_len)
         cos, sin = rope_emb
 
         # Apply rotary embeddings to query and key
@@ -111,15 +112,14 @@ class MultiHeadAttention(nn.Module):
         att = self.dropout(att)
 
         # Output
-        out = (att @ v).transpose(1, 2).reshape(B, T, C)
-        out = self.proj(out)
-        return out
+        out = (att @ v).transpose(1, 2).reshape(batch_size, seq_len, hidden_size)
+        return self.proj(out)
 
 
 class FeedForward(nn.Module):
     """Feed-forward network with SiLU activation"""
 
-    def __init__(self, hidden_size, ff_size, dropout=0.1):
+    def __init__(self, hidden_size: int, ff_size: int, dropout: float = 0.1) -> None:
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(hidden_size, ff_size, bias=False),
@@ -129,24 +129,23 @@ class FeedForward(nn.Module):
             nn.Dropout(dropout),
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.net(x)
 
 
 class TransformerBlock(nn.Module):
     """Single Transformer block"""
 
-    def __init__(self, hidden_size, num_heads, ff_size, dropout=0.1):
+    def __init__(self, hidden_size: int, num_heads: int, ff_size: int, dropout: float = 0.1) -> None:
         super().__init__()
         self.attention = MultiHeadAttention(hidden_size, num_heads, dropout)
         self.feed_forward = FeedForward(hidden_size, ff_size, dropout)
         self.norm1 = RMSNorm(hidden_size)
         self.norm2 = RMSNorm(hidden_size)
 
-    def forward(self, x, mask=None):
+    def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         x = x + self.attention(self.norm1(x), mask)
-        x = x + self.feed_forward(self.norm2(x))
-        return x
+        return x + self.feed_forward(self.norm2(x))
 
 
 class GrokkingTransformer(nn.Module):
@@ -157,20 +156,22 @@ class GrokkingTransformer(nn.Module):
 
     def __init__(
         self,
-        vocab_size,
-        hidden_size=128,
-        num_layers=4,
-        num_heads=8,
-        ff_size=512,
-        max_seq_len=512,
-        dropout=0.1,
-    ):
+        vocab_size: int,
+        hidden_size: int = 128,
+        num_layers: int = 4,
+        num_heads: int = 8,
+        ff_size: int = 512,
+        max_seq_len: int = 512,
+        dropout: float = 0.1,
+        softmax_variant: str = "standard",
+    ) -> None:
         super().__init__()
         self.hidden_size = hidden_size
         self.vocab_size = vocab_size
+        self.softmax_variant = softmax_variant
 
         # Embedding layer (identity embeddings as mentioned in paper)
-        self.embedding = nn.Embedding(vocab_size, hidden_size)
+        self.embedding = nn.Embedding(vocab_size, hidden_size, padding_idx=0)
 
         # Positional encoding
         self.pos_embed = nn.Parameter(
@@ -194,7 +195,7 @@ class GrokkingTransformer(nn.Module):
         # Initialize weights
         self.apply(self._init_weights)
 
-    def _init_weights(self, module):
+    def _init_weights(self, module: nn.Module) -> None:
         if isinstance(module, nn.Linear):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
             if module.bias is not None:
@@ -204,44 +205,47 @@ class GrokkingTransformer(nn.Module):
         elif isinstance(module, RMSNorm):
             torch.nn.init.ones_(module.weight)
 
-    def forward(self, x, mask=None):
-        B, T = x.shape
-
-        # Embeddings
-        x = self.embedding(x)
-        x = x + self.pos_embed[:, :T, :]
+    def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+        # Handle different input shapes
+        if x.dim() == 3:
+            batch_size, seq_len, _ = x.shape
+            # If input is 3D, assume it's already embedded
+            embedded = x
+        else:
+            batch_size, seq_len = x.shape
+            # Embeddings
+            embedded = self.embedding(x)
+            embedded = embedded + self.pos_embed[:, :seq_len, :]
 
         # Apply transformer blocks
         for block in self.blocks:
-            x = block(x, mask)
+            embedded = block(embedded, mask)
 
         # Final norm and output
-        x = self.norm(x)
-        logits = self.output(x)
-
-        return logits
+        embedded = self.norm(embedded)
+        return self.output(embedded)
 
 
 class SoftmaxVariants:
     """Different softmax variants as mentioned in the paper"""
 
     @staticmethod
-    def standard_softmax(logits, temperature=1.0):
+    def standard_softmax(logits: torch.Tensor, temperature: float = 1.0) -> torch.Tensor:
         """Standard exponential normalization"""
         return F.softmax(logits / temperature, dim=-1)
 
     @staticmethod
-    def stablemax(logits, temperature=1.0):
+    def stablemax(logits: torch.Tensor, temperature: float = 1.0) -> torch.Tensor:
         """Stablemax variant for numerical stability"""
 
-        def stable_transform(z):
+        def stable_transform(z: torch.Tensor) -> torch.Tensor:
             return torch.where(z >= 0, z + 1, 1 / (1 - z))
 
         transformed = stable_transform(logits / temperature)
         return transformed / transformed.sum(dim=-1, keepdim=True)
 
     @staticmethod
-    def sparsemax(logits, temperature=1.0):
+    def sparsemax(logits: torch.Tensor, temperature: float = 1.0) -> torch.Tensor:
         """Sparsemax variant that projects onto probability simplex"""
         # Use a simpler, more numerically stable implementation
         z = logits / temperature
@@ -265,6 +269,4 @@ class SoftmaxVariants:
 
         # Renormalize
         sums = result.sum(dim=-1, keepdim=True)
-        result = result / (sums + 1e-8)
-
-        return result
+        return result / (sums + 1e-8)

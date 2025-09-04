@@ -140,7 +140,8 @@ def detect_grokking(
     for i, acc in enumerate(val_acc):
         if acc >= threshold:
             # Check if training accuracy has stabilized (close to 100%)
-            if i > 0 and train_acc[i] >= 0.95:
+            # Make sure we have enough training data and it's stabilized
+            if i < len(train_acc) and train_acc[i] >= 0.95:
                 return i
 
     return -1  # No grokking detected

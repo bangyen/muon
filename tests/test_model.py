@@ -200,9 +200,9 @@ class TestTransformerModel:
         # Check that gradients exist for all parameters
         for name, param in model.named_parameters():
             assert param.grad is not None, f"No gradient for {name}"
-            assert torch.all(
-                torch.isfinite(param.grad)
-            ), f"Non-finite gradient for {name}"
+            assert torch.all(torch.isfinite(param.grad)), (
+                f"Non-finite gradient for {name}"
+            )
 
     def test_model_parameters(self):
         """Test that model has reasonable number of parameters"""

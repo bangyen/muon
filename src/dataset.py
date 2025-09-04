@@ -1,4 +1,5 @@
 import random
+from typing import Dict, List, Tuple
 
 import numpy as np
 import torch
@@ -18,7 +19,7 @@ class ModularArithmeticDataset(Dataset):
         train_split: float = 0.5,
         max_seq_len: int = 5,
         seed: int = 42,
-    ):
+    ) -> None:
         """
         Initialize modular arithmetic dataset
 
@@ -29,6 +30,15 @@ class ModularArithmeticDataset(Dataset):
             max_seq_len: Maximum sequence length
             seed: Random seed for reproducibility
         """
+        if task_type not in ["add", "mul", "div", "exp", "gcd", "parity"]:
+            raise ValueError(f"Invalid task type: {task_type}")
+        
+        if modulus <= 0:
+            raise ValueError(f"Modulus must be positive: {modulus}")
+            
+        if not 0.0 < train_split < 1.0:
+            raise ValueError(f"Train split must be between 0 and 1: {train_split}")
+            
         self.task_type = task_type
         self.modulus = modulus
         self.train_split = train_split
@@ -51,7 +61,7 @@ class ModularArithmeticDataset(Dataset):
         # Create vocabulary
         self._create_vocabulary()
 
-    def _generate_modular_data(self) -> list[tuple[int, int, int]]:
+    def _generate_modular_data(self) -> List[Tuple[int, int, int]]:
         """Generate data for modular arithmetic tasks"""
         data = []
 
@@ -92,7 +102,7 @@ class ModularArithmeticDataset(Dataset):
 
         return data
 
-    def _generate_parity_data(self) -> list[tuple[int, int, int]]:
+    def _generate_parity_data(self) -> List[Tuple[int, int, int]]:
         """Generate data for parity task (10-bit binary strings)"""
         data = []
         for i in range(1024):  # 2^10 = 1024 possible 10-bit strings
@@ -109,7 +119,7 @@ class ModularArithmeticDataset(Dataset):
             a, b = b, a % b
         return a
 
-    def _split_data(self):
+    def _split_data(self) -> None:
         """Split data into train and validation sets"""
         # Shuffle data
         random.shuffle(self.data)
@@ -118,7 +128,7 @@ class ModularArithmeticDataset(Dataset):
         self.train_data = self.data[:split_idx]
         self.val_data = self.data[split_idx:]
 
-    def _create_vocabulary(self):
+    def _create_vocabulary(self) -> None:
         """Create vocabulary mapping for tokenization"""
         # Special tokens
         self.special_tokens = {
@@ -147,14 +157,20 @@ class ModularArithmeticDataset(Dataset):
 
         # Reverse mapping
         self.idx_to_token = {v: k for k, v in self.vocab.items()}
+        
+        # Add token_to_id mapping for compatibility with tests
+        self.token_to_id = self.vocab
 
-    def _tokenize(self, a: int, b: int, result: int) -> list[int]:
+    def _tokenize(self, a: int, b: int, result: int) -> List[int]:
         """Convert arithmetic expression to token sequence"""
         if self.task_type == "parity":
             # For parity: [<bos>, number, <eos>] -> parity
+            # For parity, we need to handle large numbers (up to 1023 for 10-bit)
+            # We'll use modulo to keep it within vocabulary bounds
+            token_index = (a % self.modulus) + len(self.special_tokens)
             return [
                 self.vocab["<bos>"],
-                a + len(self.special_tokens),
+                token_index,
                 self.vocab["<eos>"],
             ]
         # For modular arithmetic: [<bos>, a, op, b, =, result, <eos>]
@@ -176,10 +192,10 @@ class ModularArithmeticDataset(Dataset):
             self.vocab["<eos>"],
         ]
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.train_data)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
         a, b, result = self.train_data[idx]
 
         # Tokenize input sequence
@@ -206,7 +222,7 @@ class ModularArithmeticDataset(Dataset):
             "result": result,
         }
 
-    def get_val_data(self) -> list[dict]:
+    def get_val_data(self) -> List[Dict[str, torch.Tensor]]:
         """Get validation data"""
         val_samples = []
         for a, b, result in self.val_data:
@@ -245,7 +261,7 @@ def create_dataloader(
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
 
-def get_task_configs() -> dict[str, dict]:
+def get_task_configs() -> Dict[str, Dict[str, int]]:
     """Get task configurations as described in the paper"""
     return {
         "gcd": {"modulus": 97, "train_split": 0.5},
