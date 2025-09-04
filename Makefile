@@ -1,4 +1,4 @@
-.PHONY: help install test lint format clean run-experiments run-quick-test visualize
+.PHONY: help install install-prod install-dev test test-quick lint format clean run-experiments visualize setup-dev build publish
 
 help: ## Show this help message
 	@echo "Muon Optimizer: Accelerating Grokking Reproduction"
@@ -7,8 +7,11 @@ help: ## Show this help message
 	@echo "Available commands:"
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-install: ## Install dependencies
+install: ## Install all dependencies (including dev)
 	pip install -e ".[dev]"
+
+install-prod: ## Install production dependencies only
+	pip install -e .
 
 install-dev: ## Install development dependencies
 	pip install -e ".[dev]"
@@ -16,8 +19,8 @@ install-dev: ## Install development dependencies
 test: ## Run tests
 	python -m pytest tests/ -v
 
-test-fast: ## Run quick test experiments
-	python -m scripts.train_tasks --quick_test --device cpu
+test-quick: ## Run quick single task test
+	python -m scripts.train_tasks --single_task --device cpu
 
 lint: ## Run linting checks
 	ruff check src/ scripts/
@@ -43,9 +46,6 @@ clean: ## Clean up generated files
 
 run-experiments: ## Run comprehensive experiments
 	python -m scripts.train_tasks --device cpu --num_runs 3
-
-run-quick-test: ## Run quick test with limited configurations
-	python -m scripts.train_tasks --quick_test --device cpu
 
 visualize: ## Create visualizations from results
 	python -m scripts.visualize_results --results_file results/experiment_results_*.json

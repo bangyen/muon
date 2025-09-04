@@ -150,6 +150,7 @@ class GrokkingTrainer:
         max_epochs: int = 500,
         grokking_threshold: float = 0.95,
         patience: int = 50,
+        quick_mode: bool = False,
     ) -> dict:
         """
         Train the model and track grokking
@@ -158,12 +159,17 @@ class GrokkingTrainer:
             max_epochs: Maximum number of epochs
             grokking_threshold: Validation accuracy threshold for grokking
             patience: Early stopping patience
+            quick_mode: Use more aggressive early stopping for quick experiments
 
         Returns:
             Training results dictionary
         """
         best_val_acc = 0.0
         patience_counter = 0
+
+        # Adjust patience for quick mode
+        if quick_mode:
+            patience = min(patience, 20)  # More aggressive early stopping
 
         print(f"Starting training with {self.softmax_variant} softmax...")
 
@@ -226,6 +232,7 @@ class ExperimentConfig:
     optimizer_config: dict
     device: str = "cpu"
     seed: int = 42
+    quick_mode: bool = False
 
 
 def run_experiment(config: ExperimentConfig) -> dict:
@@ -316,6 +323,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
     results = trainer.train(
         max_epochs=config.model_config["max_epochs"],
         grokking_threshold=config.model_config["grokking_threshold"],
+        quick_mode=config.quick_mode,
     )
 
     # Add metadata
@@ -334,7 +342,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
 
 
 def run_comprehensive_experiments(
-    device: str = "cpu", num_runs: int = 3
+    device: str = "cpu", num_runs: int = 3, single_task: bool = False
 ) -> list[dict]:
     """
     Run comprehensive experiments as described in the paper
@@ -342,22 +350,38 @@ def run_comprehensive_experiments(
     Args:
         device: Device to run on
         num_runs: Number of runs per configuration
+        single_task: Run only one task for the fastest possible test
 
     Returns:
         List of experiment results
     """
     # Model configuration
-    model_config = {
-        "hidden_size": 128,
-        "num_layers": 4,
-        "num_heads": 8,
-        "ff_size": 512,
-        "max_seq_len": 10,
-        "batch_size": 32,
-        "dropout": 0.1,
-        "max_epochs": 300,
-        "grokking_threshold": 0.95,
-    }
+    if single_task:
+        # Single task mode: absolute minimum for fastest testing
+        model_config = {
+            "hidden_size": 48,  # Very small model
+            "num_layers": 1,  # Single layer
+            "num_heads": 3,  # Few heads
+            "ff_size": 192,  # Small feedforward
+            "max_seq_len": 6,  # Very short sequences
+            "batch_size": 8,  # Small batch
+            "dropout": 0.1,
+            "max_epochs": 25,  # Very few epochs
+            "grokking_threshold": 0.85,  # Lower threshold
+        }
+    else:
+        # Full mode: original configuration
+        model_config = {
+            "hidden_size": 128,
+            "num_layers": 4,
+            "num_heads": 8,
+            "ff_size": 512,
+            "max_seq_len": 10,
+            "batch_size": 32,
+            "dropout": 0.1,
+            "max_epochs": 300,
+            "grokking_threshold": 0.95,
+        }
 
     # Optimizer configurations
     muon_config = {
@@ -371,17 +395,29 @@ def run_comprehensive_experiments(
     adamw_config = {"lr": 1e-3, "betas": (0.9, 0.98), "weight_decay": 1e-2}
 
     # Task types and softmax variants
-    task_types = ["gcd", "add", "div", "exp", "mul", "parity"]
-    softmax_variants = ["standard", "stablemax", "sparsemax"]
-    optimizer_types = ["muon", "adamw"]
+    if single_task:
+        # Single task: only 1 task, 1 softmax, 1 optimizer = 1 experiment total
+        task_types = ["add"]  # Just addition - the simplest task
+        softmax_variants = ["standard"]
+        optimizer_types = ["adamw"]
+    else:
+        # Full: all configurations
+        task_types = ["gcd", "add", "div", "exp", "mul", "parity"]
+        softmax_variants = ["standard", "stablemax", "sparsemax"]
+        optimizer_types = ["muon", "adamw"]
 
     all_results = []
 
     print("Starting comprehensive experiments...")
+    print(f"Mode: {'Single task' if single_task else 'Full'}")
     print(f"Tasks: {task_types}")
     print(f"Softmax variants: {softmax_variants}")
     print(f"Optimizers: {optimizer_types}")
     print(f"Number of runs per config: {num_runs}")
+    print(f"Max epochs: {model_config['max_epochs']}")
+    print(
+        f"Total experiments: {len(task_types) * len(softmax_variants) * len(optimizer_types) * num_runs}"
+    )
 
     for task_type in task_types:
         for softmax_variant in softmax_variants:
@@ -408,6 +444,7 @@ def run_comprehensive_experiments(
                             optimizer_config=optimizer_config,
                             device=device,
                             seed=42 + run,
+                            quick_mode=single_task,
                         )
                     )
 
@@ -489,6 +526,11 @@ def main():
         action="store_true",
         help="Run quick test with fewer configurations",
     )
+    parser.add_argument(
+        "--single_task",
+        action="store_true",
+        help="Run only one task for the fastest possible test",
+    )
 
     args = parser.parse_args()
 
@@ -496,6 +538,12 @@ def main():
         # Quick test with limited configurations
         print("Running quick test...")
         results = run_comprehensive_experiments(device=args.device, num_runs=1)
+    elif args.single_task:
+        # Single task test
+        print("Running single task test...")
+        results = run_comprehensive_experiments(
+            device=args.device, num_runs=1, single_task=True
+        )
     else:
         # Full experiments
         results = run_comprehensive_experiments(
