@@ -1,11 +1,7 @@
-import os
-import sys
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 import argparse
 import json
 import os
+import sys
 from datetime import datetime
 
 import numpy as np
@@ -14,6 +10,9 @@ import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+
+# Add src to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.dataset import ModularArithmeticDataset, get_task_configs
 from src.model import GrokkingTransformer, SoftmaxVariants
@@ -107,13 +106,12 @@ class GrokkingTrainer:
             total_loss += loss.item()
 
         avg_loss = total_loss / len(self.train_loader)
-        accuracy = (
+        return (
+            avg_loss,
             correct_predictions / total_predictions
             if total_predictions > 0
-            else 0.0
+            else 0.0,
         )
-
-        return avg_loss, accuracy
 
     def evaluate(self) -> float:
         """Evaluate on validation set"""
@@ -141,12 +139,11 @@ class GrokkingTrainer:
                 )
                 total_predictions += mask.sum().item()
 
-        accuracy = (
+        return (
             correct_predictions / total_predictions
             if total_predictions > 0
             else 0.0
         )
-        return accuracy
 
     def train(
         self,
@@ -205,7 +202,7 @@ class GrokkingTrainer:
                 )
 
         # Compile results
-        results = {
+        return {
             "grokking_epoch": self.grokking_epoch,
             "final_train_loss": self.train_losses[-1],
             "final_train_acc": self.train_accuracies[-1],
@@ -216,8 +213,6 @@ class GrokkingTrainer:
             "val_accuracies": self.val_accuracies,
             "total_epochs": len(self.train_losses),
         }
-
-        return results
 
 
 def run_experiment(

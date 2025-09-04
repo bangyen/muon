@@ -1,4 +1,5 @@
 import math
+from typing import Union
 
 import torch
 from torch.optim import Optimizer
@@ -18,14 +19,14 @@ class MuonOptimizer(Optimizer):
     def __init__(
         self,
         params,
-        lr=1e-3,
-        betas=(0.9, 0.98),
-        eps=1e-8,
-        weight_decay=1e-2,
-        spectral_norm_strength=0.1,
-        second_order_interval=10,
-        use_orthogonal_updates=True,
-    ):
+        lr: float = 1e-3,
+        betas: tuple = (0.9, 0.98),
+        eps: float = 1e-8,
+        weight_decay: float = 1e-2,
+        spectral_norm_strength: float = 0.1,
+        second_order_interval: int = 10,
+        use_orthogonal_updates: bool = True,
+    ) -> None:
         """
         Initialize Muon optimizer
 
@@ -39,15 +40,17 @@ class MuonOptimizer(Optimizer):
             second_order_interval: How often to compute second-order info
             use_orthogonal_updates: Whether to use orthogonalized gradients
         """
-        if not lr >= 0.0:
+        min_value = 0.0
+        max_beta = 1.0
+        if not lr >= min_value:
             raise ValueError(f"Invalid learning rate: {lr}")
-        if not eps >= 0.0:
+        if not eps >= min_value:
             raise ValueError(f"Invalid epsilon value: {eps}")
-        if not 0.0 <= betas[0] < 1.0:
+        if not min_value <= betas[0] < max_beta:
             raise ValueError(f"Invalid beta parameter at index 0: {betas[0]}")
-        if not 0.0 <= betas[1] < 1.0:
+        if not min_value <= betas[1] < max_beta:
             raise ValueError(f"Invalid beta parameter at index 1: {betas[1]}")
-        if not weight_decay >= 0.0:
+        if not weight_decay >= min_value:
             raise ValueError(f"Invalid weight_decay value: {weight_decay}")
 
         defaults = dict(
@@ -59,11 +62,11 @@ class MuonOptimizer(Optimizer):
             second_order_interval=second_order_interval,
             use_orthogonal_updates=use_orthogonal_updates,
         )
-        super(MuonOptimizer, self).__init__(params, defaults)
+        super().__init__(params, defaults)
 
         self.step_count = 0
 
-    def step(self, closure=None):
+    def step(self, closure=None) -> Union[float, None]:
         """Performs a single optimization step"""
         loss = None
         if closure is not None:
@@ -167,16 +170,15 @@ class MuonOptimizer(Optimizer):
         Orthogonalize current gradient with respect to previous gradient
         This promotes broader exploration by reducing redundancy in updates
         """
-        if torch.norm(prev_grad) < 1e-8:
+        epsilon_threshold = 1e-8
+        if torch.norm(prev_grad) < epsilon_threshold:
             return current_grad
 
         # Project current gradient onto the space orthogonal to previous gradient
         proj_coeff = torch.sum(current_grad * prev_grad) / torch.sum(
             prev_grad * prev_grad
         )
-        orthogonal_grad = current_grad - proj_coeff * prev_grad
-
-        return orthogonal_grad
+        return current_grad - proj_coeff * prev_grad
 
     def _update_hessian_diag(
         self,
@@ -194,9 +196,7 @@ class MuonOptimizer(Optimizer):
 
         # Smooth update
         alpha = 0.9
-        updated_hessian = alpha * hessian_diag + (1 - alpha) * new_hessian
-
-        return updated_hessian
+        return alpha * hessian_diag + (1 - alpha) * new_hessian
 
     def _apply_spectral_norm_constraint(
         self, adaptive_lr: torch.Tensor, param: torch.Tensor, strength: float
@@ -205,8 +205,9 @@ class MuonOptimizer(Optimizer):
         Apply spectral norm constraint to prevent runaway weights
         This keeps training stable and avoids "softmax collapse"
         """
+        min_dimensions_for_svd = 2
         # Compute spectral norm of the parameter
-        if param.dim() >= 2:
+        if param.dim() >= min_dimensions_for_svd:
             # For matrices, compute the largest singular value
             u, s, v = torch.svd(param, compute_uv=False)
             spectral_norm = (
@@ -221,10 +222,11 @@ class MuonOptimizer(Optimizer):
             spectral_norm = spectral_norm.mean()  # Take mean if it's a tensor
 
         # Apply constraint if spectral norm is too large
-        if spectral_norm.item() > 1.0:
+        max_spectral_norm = 1.0
+        if spectral_norm.item() > max_spectral_norm:
             # Scale down the learning rate to prevent further growth
             scale_factor = 1.0 / (
-                1.0 + strength * (spectral_norm.item() - 1.0)
+                1.0 + strength * (spectral_norm.item() - max_spectral_norm)
             )
             adaptive_lr = adaptive_lr * scale_factor
 

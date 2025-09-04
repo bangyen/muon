@@ -1,15 +1,14 @@
-import os
-import sys
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 import argparse
 import json
 import os
+import sys
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+
+# Add src to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def create_grokking_comparison_plot(
@@ -359,8 +358,7 @@ def create_summary_table(df: pd.DataFrame, output_dir: str = "plots"):
 def load_results(results_file: str) -> list[dict]:
     """Load experiment results from JSON file"""
     with open(results_file) as f:
-        results = json.load(f)
-    return results
+        return json.load(f)
 
 
 def main():
@@ -397,7 +395,7 @@ def main():
 
     # 1. Grokking comparison plot
     print("Creating grokking comparison plot...")
-    grokking_df = create_grokking_comparison_plot(df, args.output_dir)
+    create_grokking_comparison_plot(df, args.output_dir)
 
     # 2. Learning curves
     print("Creating learning curves...")

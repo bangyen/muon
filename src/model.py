@@ -1,5 +1,5 @@
 import math
-from typing import Optional, Tuple
+from typing import Optional
 
 import torch
 import torch.nn.functional as F
@@ -29,7 +29,9 @@ class RotaryPositionalEmbedding(nn.Module):
         self.register_buffer("inv_freq", inv_freq)
         self.max_seq_len = max_seq_len
 
-    def forward(self, x: torch.Tensor, seq_len: Optional[int] = None) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self, x: torch.Tensor, seq_len: Optional[int] = None
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         if seq_len is None:
             seq_len = x.shape[1]
 
@@ -52,7 +54,9 @@ def rotate_half(x: torch.Tensor) -> torch.Tensor:
     return torch.cat((-x2, x1), dim=-1)
 
 
-def apply_rotary_pos_emb(q: torch.Tensor, k: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+def apply_rotary_pos_emb(
+    q: torch.Tensor, k: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor
+) -> tuple[torch.Tensor, torch.Tensor]:
     """Apply rotary positional embeddings to query and key"""
     # q, k: [batch, heads, seq_len, head_dim]
     # cos, sin: [1, 1, seq_len, head_dim//2]
@@ -75,25 +79,32 @@ def apply_rotary_pos_emb(q: torch.Tensor, k: torch.Tensor, cos: torch.Tensor, si
 class MultiHeadAttention(nn.Module):
     """Multi-head self-attention with RoPE"""
 
-    def __init__(self, hidden_size: int, num_heads: int, dropout: float = 0.1) -> None:
+    def __init__(
+        self, hidden_size: int, num_heads: int, dropout: float = 0.1
+    ) -> None:
         super().__init__()
         self.hidden_size = hidden_size
         self.num_heads = num_heads
         self.head_dim = hidden_size // num_heads
-        assert self.head_dim * num_heads == hidden_size
+        if self.head_dim * num_heads != hidden_size:
+            raise ValueError(
+                f"hidden_size ({hidden_size}) must be divisible by num_heads ({num_heads})"
+            )
 
         self.qkv = nn.Linear(hidden_size, hidden_size * 3, bias=False)
         self.proj = nn.Linear(hidden_size, hidden_size, bias=False)
         self.dropout = nn.Dropout(dropout)
         self.rope = RotaryPositionalEmbedding(self.head_dim)
 
-    def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def forward(
+        self, x: torch.Tensor, mask: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
         batch_size, seq_len, hidden_size = x.shape
         qkv = self.qkv(x).chunk(3, dim=-1)
         q, k, v = map(
-            lambda t: t.view(batch_size, seq_len, self.num_heads, self.head_dim).transpose(
-                1, 2
-            ),
+            lambda t: t.view(
+                batch_size, seq_len, self.num_heads, self.head_dim
+            ).transpose(1, 2),
             qkv,
         )
 
@@ -112,14 +123,18 @@ class MultiHeadAttention(nn.Module):
         att = self.dropout(att)
 
         # Output
-        out = (att @ v).transpose(1, 2).reshape(batch_size, seq_len, hidden_size)
+        out = (
+            (att @ v).transpose(1, 2).reshape(batch_size, seq_len, hidden_size)
+        )
         return self.proj(out)
 
 
 class FeedForward(nn.Module):
     """Feed-forward network with SiLU activation"""
 
-    def __init__(self, hidden_size: int, ff_size: int, dropout: float = 0.1) -> None:
+    def __init__(
+        self, hidden_size: int, ff_size: int, dropout: float = 0.1
+    ) -> None:
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(hidden_size, ff_size, bias=False),
@@ -136,14 +151,22 @@ class FeedForward(nn.Module):
 class TransformerBlock(nn.Module):
     """Single Transformer block"""
 
-    def __init__(self, hidden_size: int, num_heads: int, ff_size: int, dropout: float = 0.1) -> None:
+    def __init__(
+        self,
+        hidden_size: int,
+        num_heads: int,
+        ff_size: int,
+        dropout: float = 0.1,
+    ) -> None:
         super().__init__()
         self.attention = MultiHeadAttention(hidden_size, num_heads, dropout)
         self.feed_forward = FeedForward(hidden_size, ff_size, dropout)
         self.norm1 = RMSNorm(hidden_size)
         self.norm2 = RMSNorm(hidden_size)
 
-    def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def forward(
+        self, x: torch.Tensor, mask: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
         x = x + self.attention(self.norm1(x), mask)
         return x + self.feed_forward(self.norm2(x))
 
@@ -205,9 +228,12 @@ class GrokkingTransformer(nn.Module):
         elif isinstance(module, RMSNorm):
             torch.nn.init.ones_(module.weight)
 
-    def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def forward(
+        self, x: torch.Tensor, mask: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
         # Handle different input shapes
-        if x.dim() == 3:
+        input_dim_3d = 3
+        if x.dim() == input_dim_3d:
             batch_size, seq_len, _ = x.shape
             # If input is 3D, assume it's already embedded
             embedded = x
@@ -230,12 +256,16 @@ class SoftmaxVariants:
     """Different softmax variants as mentioned in the paper"""
 
     @staticmethod
-    def standard_softmax(logits: torch.Tensor, temperature: float = 1.0) -> torch.Tensor:
+    def standard_softmax(
+        logits: torch.Tensor, temperature: float = 1.0
+    ) -> torch.Tensor:
         """Standard exponential normalization"""
         return F.softmax(logits / temperature, dim=-1)
 
     @staticmethod
-    def stablemax(logits: torch.Tensor, temperature: float = 1.0) -> torch.Tensor:
+    def stablemax(
+        logits: torch.Tensor, temperature: float = 1.0
+    ) -> torch.Tensor:
         """Stablemax variant for numerical stability"""
 
         def stable_transform(z: torch.Tensor) -> torch.Tensor:
@@ -245,7 +275,9 @@ class SoftmaxVariants:
         return transformed / transformed.sum(dim=-1, keepdim=True)
 
     @staticmethod
-    def sparsemax(logits: torch.Tensor, temperature: float = 1.0) -> torch.Tensor:
+    def sparsemax(
+        logits: torch.Tensor, temperature: float = 1.0
+    ) -> torch.Tensor:
         """Sparsemax variant that projects onto probability simplex"""
         # Use a simpler, more numerically stable implementation
         z = logits / temperature
