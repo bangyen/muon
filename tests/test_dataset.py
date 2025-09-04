@@ -55,13 +55,19 @@ class TestModularArithmeticDataset:
             ("div", 9312),  # Some numbers don't have multiplicative inverses
             ("exp", 9409),
             ("gcd", 9409),
-            ("parity", 1024),  # 2^10 = 1024
+            ("parity", 1024),  # 2^10 = 1024 (uses modulus 2, not 97)
         ]
 
         for task_type, expected_size in test_cases:
-            dataset = ModularArithmeticDataset(
-                task_type, modulus=modulus, train_split=0.5
-            )
+            if task_type == "parity":
+                # Parity task uses modulus 2, not 97
+                dataset = ModularArithmeticDataset(
+                    task_type, modulus=2, train_split=0.5
+                )
+            else:
+                dataset = ModularArithmeticDataset(
+                    task_type, modulus=modulus, train_split=0.5
+                )
 
             # Check data size
             assert len(dataset.data) == expected_size
@@ -73,10 +79,13 @@ class TestModularArithmeticDataset:
                 if task_type == "parity":
                     # For parity, first input can be up to 1023 (10-bit number)
                     assert 0 <= item[0] < 1024  # 10-bit number
-                    assert 0 <= item[1] < modulus  # second input
+                    assert 0 <= item[1] < 2  # second input (modulus 2)
+                    assert 0 <= item[2] < 2  # output (modulus 2)
                 else:
                     assert all(0 <= x < modulus for x in item[:2])  # inputs
-                assert 0 <= item[2] < modulus  # output
+                assert (
+                    0 <= item[2] < (2 if task_type == "parity" else modulus)
+                )  # output
 
     def test_train_val_split(self):
         """Test train/validation split functionality"""

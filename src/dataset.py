@@ -131,10 +131,10 @@ class ModularArithmeticDataset(Dataset[dict[str, Union[torch.Tensor, int]]]):
         return data
 
     def _generate_parity_data(self) -> list[tuple[int, int, int]]:
-        """Generate data for parity task (16-bit binary strings)"""
+        """Generate data for parity task (10-bit binary strings)"""
         data = []
-        for i in range(65536):  # 2^16 = 65536 possible 16-bit strings
-            binary_str = format(i, "016b")
+        for i in range(1024):  # 2^10 = 1024 possible 10-bit strings
+            binary_str = format(i, "010b")
             parity = sum(int(bit) for bit in binary_str) % 2
             data.append(
                 (i, 0, parity)
