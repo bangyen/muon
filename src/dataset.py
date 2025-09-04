@@ -131,10 +131,10 @@ class ModularArithmeticDataset(Dataset[dict[str, Union[torch.Tensor, int]]]):
         return data
 
     def _generate_parity_data(self) -> list[tuple[int, int, int]]:
-        """Generate data for parity task (10-bit binary strings)"""
+        """Generate data for parity task (16-bit binary strings)"""
         data = []
-        for i in range(1024):  # 2^10 = 1024 possible 10-bit strings
-            binary_str = format(i, "010b")
+        for i in range(65536):  # 2^16 = 65536 possible 16-bit strings
+            binary_str = format(i, "016b")
             parity = sum(int(bit) for bit in binary_str) % 2
             data.append(
                 (i, 0, parity)
@@ -307,5 +307,8 @@ def get_task_configs() -> dict[str, dict[str, Union[int, float]]]:
         "div": {"modulus": 97, "train_split": 0.8},
         "exp": {"modulus": 97, "train_split": 0.7},
         "mul": {"modulus": 97, "train_split": 0.5},
-        "parity": {"modulus": 2, "train_split": 0.5},
+        "parity": {
+            "modulus": 2,
+            "train_split": 0.1,
+        },  # Much smaller train split
     }

@@ -359,15 +359,15 @@ def run_comprehensive_experiments(
     if single_task:
         # Single task mode: absolute minimum for fastest testing
         model_config = {
-            "hidden_size": 48,  # Very small model
+            "hidden_size": 8,  # Extremely small model
             "num_layers": 1,  # Single layer
-            "num_heads": 3,  # Few heads
-            "ff_size": 192,  # Small feedforward
+            "num_heads": 1,  # Single head
+            "ff_size": 32,  # Very small feedforward
             "max_seq_len": 6,  # Very short sequences
-            "batch_size": 8,  # Small batch
-            "dropout": 0.1,
-            "max_epochs": 25,  # Very few epochs
-            "grokking_threshold": 0.85,  # Lower threshold
+            "batch_size": 4,  # Small batch
+            "dropout": 0.5,  # High dropout
+            "max_epochs": 50,  # More epochs to see grokking
+            "grokking_threshold": 0.99,  # Very high threshold
         }
     else:
         # Full mode: original configuration
@@ -392,14 +392,18 @@ def run_comprehensive_experiments(
         "second_order_interval": 10,
     }
 
-    adamw_config = {"lr": 1e-3, "betas": (0.9, 0.98), "weight_decay": 1e-2}
+    adamw_config = {
+        "lr": 5e-4,
+        "betas": (0.9, 0.98),
+        "weight_decay": 1e-1,
+    }  # Lower lr, higher weight decay
 
     # Task types and softmax variants
     if single_task:
-        # Single task: only 1 task, 1 softmax, 1 optimizer = 1 experiment total
-        task_types = ["add"]  # Just addition - the simplest task
+        # Single task: only 1 task, 1 softmax, 2 optimizers = 2 experiments total
+        task_types = ["exp"]  # Exponentiation is the hardest task
         softmax_variants = ["standard"]
-        optimizer_types = ["adamw"]
+        optimizer_types = ["muon", "adamw"]
     else:
         # Full: all configurations
         task_types = ["gcd", "add", "div", "exp", "mul", "parity"]
