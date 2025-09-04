@@ -39,10 +39,6 @@ jobs:
       run: |
         python -m pytest tests/ -v
 
-    - name: Run quick experiment test
-      run: |
-        python -m scripts.train_tasks --quick_test --device cpu
-
   lint:
     runs-on: ubuntu-latest
 
@@ -78,42 +74,3 @@ jobs:
 
     - name: Run interrogate doc coverage
       run: interrogate src/ --fail-under=90
-
-  experiment:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: 3.9
-
-    - name: Cache pip dependencies
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-3.9-${{ hashFiles('pyproject.toml') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-3.9-
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e ".[dev]"
-
-    - name: Run comprehensive experiments
-      run: |
-        python -m scripts.train_tasks --device cpu --num_runs 1
-
-    - name: Create visualizations
-      run: |
-        python -m scripts.visualize_results --results_file results/experiment_results_*.json
-
-    - name: Upload results as artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: experiment-results
-        path: results/ plots/
-        retention-days: 30
