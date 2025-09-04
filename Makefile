@@ -8,10 +8,10 @@ help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 install: ## Install dependencies
-	pip install -r requirements.txt
+	pip install -e ".[dev]"
 
 install-dev: ## Install development dependencies
-	pip install ruff mypy interrogate pre-commit types-PyYAML
+	pip install -e ".[dev]"
 
 test: ## Run tests
 	python test_implementation.py

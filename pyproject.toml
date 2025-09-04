@@ -38,6 +38,8 @@ dev = [
     "interrogate",
     "pre-commit",
     "types-PyYAML",
+    "build",
+    "twine",
 ]
 
 [build-system]
