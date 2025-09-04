@@ -25,11 +25,27 @@ class RMSNorm(nn.Module):
     """RMS Normalization as used in the paper"""
 
     def __init__(self, hidden_size: int, eps: float = 1e-6) -> None:
+        """
+        Initialize RMS normalization layer
+
+        Args:
+            hidden_size: Size of the hidden dimension
+            eps: Small constant for numerical stability
+        """
         super().__init__()
         self.eps = eps
         self.weight = nn.Parameter(torch.ones(hidden_size))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass for RMS normalization
+
+        Args:
+            x: Input tensor of shape [batch_size, seq_len, hidden_size]
+
+        Returns:
+            Normalized tensor of same shape as input
+        """
         # Calculate RMS
         rms = torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)
         return x * rms * self.weight
@@ -39,6 +55,13 @@ class RotaryPositionalEmbedding(nn.Module):
     """Rotary Positional Embeddings (RoPE)"""
 
     def __init__(self, dim: int, max_seq_len: int = 512) -> None:
+        """
+        Initialize rotary positional embedding layer
+
+        Args:
+            dim: Dimension of the embedding
+            max_seq_len: Maximum sequence length
+        """
         super().__init__()
         inv_freq = 1.0 / (10000 ** (torch.arange(0, dim, 2).float() / dim))
         self.register_buffer("inv_freq", inv_freq)
@@ -47,6 +70,16 @@ class RotaryPositionalEmbedding(nn.Module):
     def forward(
         self, x: torch.Tensor, seq_len: Optional[int] = None
     ) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        Forward pass for rotary positional embeddings
+
+        Args:
+            x: Input tensor
+            seq_len: Sequence length (optional, defaults to x.shape[1])
+
+        Returns:
+            Tuple of (cos, sin) tensors for rotary embeddings
+        """
         if seq_len is None:
             seq_len = x.shape[1]
 
@@ -63,7 +96,15 @@ class RotaryPositionalEmbedding(nn.Module):
 
 
 def rotate_half(x: torch.Tensor) -> torch.Tensor:
-    """Rotate half the hidden dims of the input"""
+    """
+    Rotate half the hidden dims of the input
+
+    Args:
+        x: Input tensor
+
+    Returns:
+        Tensor with rotated dimensions
+    """
     x1 = x[..., : x.shape[-1] // 2]
     x2 = x[..., x.shape[-1] // 2 :]
     return torch.cat((-x2, x1), dim=-1)
@@ -72,7 +113,18 @@ def rotate_half(x: torch.Tensor) -> torch.Tensor:
 def apply_rotary_pos_emb(
     q: torch.Tensor, k: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Apply rotary positional embeddings to query and key"""
+    """
+    Apply rotary positional embeddings to query and key
+
+    Args:
+        q: Query tensor of shape [batch, heads, seq_len, head_dim]
+        k: Key tensor of shape [batch, heads, seq_len, head_dim]
+        cos: Cosine values for rotation
+        sin: Sine values for rotation
+
+    Returns:
+        Tuple of (rotated_q, rotated_k) tensors
+    """
     # q, k: [batch, heads, seq_len, head_dim]
     # cos, sin: [1, 1, seq_len, head_dim//2]
 
@@ -97,6 +149,14 @@ class MultiHeadAttention(nn.Module):
     def __init__(
         self, hidden_size: int, num_heads: int, dropout: float = 0.1
     ) -> None:
+        """
+        Initialize multi-head attention layer
+
+        Args:
+            hidden_size: Size of the hidden dimension
+            num_heads: Number of attention heads
+            dropout: Dropout probability
+        """
         super().__init__()
         self.hidden_size = hidden_size
         self.num_heads = num_heads
@@ -114,6 +174,16 @@ class MultiHeadAttention(nn.Module):
     def forward(
         self, x: torch.Tensor, mask: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
+        """
+        Forward pass for multi-head attention
+
+        Args:
+            x: Input tensor of shape [batch_size, seq_len, hidden_size]
+            mask: Optional attention mask
+
+        Returns:
+            Output tensor of same shape as input
+        """
         batch_size, seq_len, hidden_size = x.shape
         qkv = self.qkv(x).chunk(3, dim=-1)
         q, k, v = map(
@@ -150,6 +220,14 @@ class FeedForward(nn.Module):
     def __init__(
         self, hidden_size: int, ff_size: int, dropout: float = 0.1
     ) -> None:
+        """
+        Initialize feed-forward network
+
+        Args:
+            hidden_size: Size of the hidden dimension
+            ff_size: Size of the feed-forward layer
+            dropout: Dropout probability
+        """
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(hidden_size, ff_size, bias=False),
@@ -160,6 +238,15 @@ class FeedForward(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass for feed-forward network
+
+        Args:
+            x: Input tensor
+
+        Returns:
+            Output tensor after feed-forward transformation
+        """
         return self.net(x)
 
 
@@ -173,6 +260,15 @@ class TransformerBlock(nn.Module):
         ff_size: int,
         dropout: float = 0.1,
     ) -> None:
+        """
+        Initialize transformer block
+
+        Args:
+            hidden_size: Size of the hidden dimension
+            num_heads: Number of attention heads
+            ff_size: Size of the feed-forward layer
+            dropout: Dropout probability
+        """
         super().__init__()
         self.attention = MultiHeadAttention(hidden_size, num_heads, dropout)
         self.feed_forward = FeedForward(hidden_size, ff_size, dropout)
@@ -182,6 +278,16 @@ class TransformerBlock(nn.Module):
     def forward(
         self, x: torch.Tensor, mask: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
+        """
+        Forward pass for transformer block
+
+        Args:
+            x: Input tensor
+            mask: Optional attention mask
+
+        Returns:
+            Output tensor after transformer block processing
+        """
         x = x + self.attention(self.norm1(x), mask)
         return x + self.feed_forward(self.norm2(x))
 
@@ -193,6 +299,12 @@ class GrokkingTransformer(nn.Module):
     """
 
     def __init__(self, config: ModelConfig) -> None:
+        """
+        Initialize GrokkingTransformer
+
+        Args:
+            config: Model configuration
+        """
         super().__init__()
         self.hidden_size = config.hidden_size
         self.vocab_size = config.vocab_size
@@ -233,6 +345,12 @@ class GrokkingTransformer(nn.Module):
         self.apply(self._init_weights)
 
     def _init_weights(self, module: nn.Module) -> None:
+        """
+        Initialize weights for different module types
+
+        Args:
+            module: PyTorch module to initialize
+        """
         if isinstance(module, nn.Linear):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
             if module.bias is not None:
@@ -245,6 +363,16 @@ class GrokkingTransformer(nn.Module):
     def forward(
         self, x: torch.Tensor, mask: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
+        """
+        Forward pass for the GrokkingTransformer
+
+        Args:
+            x: Input tensor of shape [batch_size, seq_len] or [batch_size, seq_len, hidden_size]
+            mask: Optional attention mask
+
+        Returns:
+            Output logits of shape [batch_size, seq_len, vocab_size]
+        """
         # Handle different input shapes
         input_dim_3d = 3
         if x.dim() == input_dim_3d:
@@ -273,16 +401,43 @@ class SoftmaxVariants:
     def standard_softmax(
         logits: torch.Tensor, temperature: float = 1.0
     ) -> torch.Tensor:
-        """Standard exponential normalization"""
+        """
+        Standard exponential normalization
+
+        Args:
+            logits: Input logits
+            temperature: Temperature parameter for softmax
+
+        Returns:
+            Softmax probabilities
+        """
         return F.softmax(logits / temperature, dim=-1)
 
     @staticmethod
     def stablemax(
         logits: torch.Tensor, temperature: float = 1.0
     ) -> torch.Tensor:
-        """Stablemax variant for numerical stability"""
+        """
+        Stablemax variant for numerical stability
+
+        Args:
+            logits: Input logits
+            temperature: Temperature parameter
+
+        Returns:
+            Stablemax probabilities
+        """
 
         def stable_transform(z: torch.Tensor) -> torch.Tensor:
+            """
+            Apply stable transformation to prevent numerical instability
+
+            Args:
+                z: Input tensor
+
+            Returns:
+                Transformed tensor
+            """
             return torch.where(z >= 0, z + 1, 1 / (1 - z))
 
         transformed = stable_transform(logits / temperature)
@@ -292,7 +447,16 @@ class SoftmaxVariants:
     def sparsemax(
         logits: torch.Tensor, temperature: float = 1.0
     ) -> torch.Tensor:
-        """Sparsemax variant that projects onto probability simplex"""
+        """
+        Sparsemax variant that projects onto probability simplex
+
+        Args:
+            logits: Input logits
+            temperature: Temperature parameter
+
+        Returns:
+            Sparse probability distribution
+        """
         # Use a simpler, more numerically stable implementation
         z = logits / temperature
 

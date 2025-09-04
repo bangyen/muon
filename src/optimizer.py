@@ -77,7 +77,15 @@ class MuonOptimizer(Optimizer):
     def step(
         self, closure: Optional[Callable[[], float]] = None
     ) -> Optional[float]:
-        """Performs a single optimization step"""
+        """
+        Performs a single optimization step
+
+        Args:
+            closure: Optional closure that reevaluates the model and returns the loss
+
+        Returns:
+            The loss value if closure is provided, otherwise None
+        """
         loss = None
         if closure is not None:
             loss = closure()

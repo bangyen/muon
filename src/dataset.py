@@ -205,9 +205,19 @@ class ModularArithmeticDataset(Dataset[dict[str, Union[torch.Tensor, int]]]):
         ]
 
     def __len__(self) -> int:
+        """Return the number of training samples"""
         return len(self.train_data)
 
     def __getitem__(self, idx: int) -> dict[str, Union[torch.Tensor, int]]:
+        """
+        Get a single training sample
+
+        Args:
+            idx: Index of the sample
+
+        Returns:
+            Dictionary containing input tokens, target tokens, and result
+        """
         a, b, result = self.train_data[idx]
 
         # Tokenize input sequence
