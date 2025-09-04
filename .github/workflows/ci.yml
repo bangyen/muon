@@ -41,7 +41,7 @@ jobs:
 
     - name: Run quick experiment test
       run: |
-        python scripts/train_tasks.py --quick_test --device cpu
+        python -m scripts.train_tasks --quick_test --device cpu
 
   lint:
     runs-on: ubuntu-latest
@@ -105,11 +105,11 @@ jobs:
 
     - name: Run comprehensive experiments
       run: |
-        python scripts/train_tasks.py --device cpu --num_runs 1
+        python -m scripts.train_tasks --device cpu --num_runs 1
 
     - name: Create visualizations
       run: |
-        python scripts/visualize_results.py --results_file results/experiment_results_*.json
+        python -m scripts.visualize_results --results_file results/experiment_results_*.json
 
     - name: Upload results as artifacts
       uses: actions/upload-artifact@v4

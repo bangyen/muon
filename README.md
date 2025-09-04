@@ -34,21 +34,21 @@ pip install -r requirements.txt
 
 ```bash
 # Run a quick test with limited configurations
-python scripts/train_tasks.py --quick_test --device cpu
+python -m scripts.train_tasks --quick_test --device cpu
 ```
 
 ### Run Full Experiments
 
 ```bash
 # Run comprehensive experiments (takes several hours)
-python scripts/train_tasks.py --device cpu --num_runs 3
+python -m scripts.train_tasks --device cpu --num_runs 3
 ```
 
 ### Visualize Results
 
 ```bash
 # After running experiments, create visualizations
-python scripts/visualize_results.py --results_file results/experiment_results_YYYYMMDD_HHMMSS.json
+python -m scripts.visualize_results --results_file results/experiment_results_YYYYMMDD_HHMMSS.json
 ```
 
 ## 📁 Project Structure

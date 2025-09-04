@@ -17,7 +17,7 @@ test: ## Run tests
 	python -m pytest tests/ -v
 
 test-fast: ## Run quick test experiments
-	python scripts/train_tasks.py --quick_test --device cpu
+	python -m scripts.train_tasks --quick_test --device cpu
 
 lint: ## Run linting checks
 	ruff check src/ scripts/
@@ -42,13 +42,13 @@ clean: ## Clean up generated files
 	find . -name "__pycache__" -delete
 
 run-experiments: ## Run comprehensive experiments
-	python scripts/train_tasks.py --device cpu --num_runs 3
+	python -m scripts.train_tasks --device cpu --num_runs 3
 
 run-quick-test: ## Run quick test with limited configurations
-	python scripts/train_tasks.py --quick_test --device cpu
+	python -m scripts.train_tasks --quick_test --device cpu
 
 visualize: ## Create visualizations from results
-	python scripts/visualize_results.py --results_file results/experiment_results_*.json
+	python -m scripts.visualize_results --results_file results/experiment_results_*.json
 
 setup-dev: install-dev ## Setup development environment
 	pre-commit install

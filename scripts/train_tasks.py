@@ -1,7 +1,6 @@
 import argparse
 import json
 import os
-import sys
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -19,9 +18,6 @@ from src.dataset import (
 )
 from src.model import GrokkingTransformer, ModelConfig, SoftmaxVariants
 from src.optimizer import MuonOptimizer, OptimizerConfig
-
-# Add src to path for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 @dataclass

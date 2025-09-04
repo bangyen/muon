@@ -1,14 +1,10 @@
 import argparse
 import json
 import os
-import sys
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-
-# Add src to path for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def create_grokking_comparison_plot(
