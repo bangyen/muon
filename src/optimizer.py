@@ -191,13 +191,8 @@ class MuonOptimizer(Optimizer):
                         adaptive_lr, p.data, spectral_norm_strength
                     )
 
-                # Update parameters (AdamW-style update for now)
-                p.data.addcdiv_(
-                    exp_avg,
-                    bias_correction2_sqrt * torch.sqrt(exp_avg_sq)
-                    + group["eps"],
-                    value=-step_size,
-                )
+                # Update parameters using adaptive learning rate (Muon style)
+                p.data.add_(-adaptive_lr * exp_avg)
 
                 # Store current gradient for next iteration
                 prev_grad.copy_(grad)
@@ -248,12 +243,16 @@ class MuonOptimizer(Optimizer):
         Returns:
             Updated diagonal Hessian approximation
         """
-        # Simple diagonal Hessian approximation based on gradient magnitude
-        # More sophisticated methods could be used here
-        new_hessian = torch.abs(grad) + 0.1 * torch.sqrt(exp_avg_sq)
+        # Improved diagonal Hessian approximation based on paper's description
+        # The paper mentions this helps "reach generalization faster with fewer steps"
+        grad_magnitude = torch.abs(grad)
+        exp_avg_sqrt = torch.sqrt(exp_avg_sq + 1e-8)
 
-        # Smooth update
-        alpha = 0.9
+        # Combine gradient magnitude with exponential moving average
+        new_hessian = grad_magnitude + 0.1 * exp_avg_sqrt
+
+        # Smooth update with momentum
+        alpha = 0.95  # Increased from 0.9 for more stability
         return alpha * hessian_diag + (1 - alpha) * new_hessian
 
     def _apply_spectral_norm_constraint(
@@ -276,10 +275,16 @@ class MuonOptimizer(Optimizer):
         # Compute spectral norm of the parameter
         if param.dim() >= min_dimensions_for_svd:
             # For matrices, compute the largest singular value
-            u, s, v = torch.svd(param, compute_uv=False)
-            spectral_norm = (
-                s[0] if len(s) > 0 else torch.tensor(0.0, device=param.device)
-            )
+            try:
+                u, s, v = torch.svd(param, compute_uv=False)
+                spectral_norm = (
+                    s[0]
+                    if len(s) > 0
+                    else torch.tensor(0.0, device=param.device)
+                )
+            except RuntimeError:
+                # Fallback to L2 norm if SVD fails
+                spectral_norm = torch.norm(param, p=2)
         else:
             # For vectors, use L2 norm (scalar)
             spectral_norm = torch.norm(param, p=2)
@@ -288,8 +293,8 @@ class MuonOptimizer(Optimizer):
         if spectral_norm.dim() > 0:
             spectral_norm = spectral_norm.mean()  # Take mean if it's a tensor
 
-        # Apply constraint if spectral norm is too large
-        max_spectral_norm = 1.0
+        # Apply constraint if spectral norm is too large (paper mentions preventing "softmax collapse")
+        max_spectral_norm = 2.0  # Increased from 1.0 to allow more flexibility
         if spectral_norm.item() > max_spectral_norm:
             # Scale down the learning rate to prevent further growth
             scale_factor = 1.0 / (
