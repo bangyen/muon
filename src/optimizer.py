@@ -294,7 +294,7 @@ class MuonOptimizer(Optimizer):
             spectral_norm = spectral_norm.mean()  # Take mean if it's a tensor
 
         # Apply constraint if spectral norm is too large (paper mentions preventing "softmax collapse")
-        max_spectral_norm = 2.0  # Increased from 1.0 to allow more flexibility
+        max_spectral_norm = 5.0  # Less restrictive to allow better exploration
         if spectral_norm.item() > max_spectral_norm:
             # Scale down the learning rate to prevent further growth
             scale_factor = 1.0 / (

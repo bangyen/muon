@@ -482,26 +482,23 @@ class SoftmaxVariants:
         Returns:
             Sparse probability distribution
         """
-        # Use a simpler, more numerically stable implementation
+        # Proper sparsemax implementation as described in the paper
         z = logits / temperature
 
-        # Find the maximum value for numerical stability
-        z_max = z.max(dim=-1, keepdim=True)[0]
-        z_shifted = z - z_max
+        # Sort logits in descending order
+        z_sorted, _ = torch.sort(z, dim=-1, descending=True)
 
-        # Apply softmax-like transformation but with sparsity
-        exp_z = torch.exp(z_shifted)
-        sum_exp = exp_z.sum(dim=-1, keepdim=True)
+        # Find the threshold tau
+        cumsum = torch.cumsum(z_sorted, dim=-1)
+        range_vals = torch.arange(1, z_sorted.shape[-1] + 1, device=z.device)
+        threshold = z_sorted - (cumsum - 1) / range_vals
 
-        # Normalize to get probabilities
-        result = exp_z / (sum_exp + 1e-8)
+        # Find the largest index where threshold > 0
+        valid = threshold > 0
+        k = torch.sum(valid, dim=-1, keepdim=True)
 
-        # Apply sparsity by thresholding small values
-        threshold = 0.01
-        result = torch.where(
-            result < threshold, torch.zeros_like(result), result
-        )
+        # Compute tau
+        tau = (torch.sum(z_sorted * valid, dim=-1, keepdim=True) - 1) / k
 
-        # Renormalize
-        sums = result.sum(dim=-1, keepdim=True)
-        return result / (sums + 1e-8)
+        # Apply sparsemax transformation
+        return torch.clamp(z - tau, min=0)

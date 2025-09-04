@@ -188,8 +188,10 @@ class GrokkingTrainer:
                 self.grokking_epoch = epoch
                 print(f"\nGrokking detected at epoch {epoch}!")
                 print(f"Validation accuracy: {val_acc:.4f}")
+                # Stop training immediately when grokking is detected
+                break
 
-            # Early stopping
+            # Early stopping (only if grokking hasn't been detected)
             if val_acc > best_val_acc:
                 best_val_acc = val_acc
                 patience_counter = 0
@@ -367,7 +369,7 @@ def run_comprehensive_experiments(
             "batch_size": 4,  # Small batch
             "dropout": 0.5,  # High dropout
             "max_epochs": 50,  # More epochs to see grokking
-            "grokking_threshold": 0.99,  # Very high threshold
+            "grokking_threshold": 0.95,  # Match paper threshold
         }
     else:
         # Full mode: original configuration
@@ -383,21 +385,21 @@ def run_comprehensive_experiments(
             "grokking_threshold": 0.95,
         }
 
-    # Optimizer configurations
+    # Optimizer configurations - based on paper findings
     muon_config = {
-        "lr": 5e-4,  # Match AdamW learning rate
+        "lr": 1e-3,  # Slightly higher learning rate for Muon as per paper
         "betas": (0.9, 0.98),
-        "weight_decay": 1e-2,  # Keep lower weight decay for Muon
+        "weight_decay": 1e-2,  # Lower weight decay for Muon (spectral norm helps)
         "spectral_norm_strength": 0.1,  # Enable spectral norm constraint (key Muon feature)
         "second_order_interval": 1,  # Update every step for better second-order info
         "use_orthogonal_updates": True,  # Enable orthogonal updates (key Muon feature)
     }
 
     adamw_config = {
-        "lr": 5e-4,
+        "lr": 5e-4,  # Standard learning rate
         "betas": (0.9, 0.98),
-        "weight_decay": 1e-1,
-    }  # Lower lr, higher weight decay
+        "weight_decay": 1e-1,  # Higher weight decay needed for AdamW to achieve grokking
+    }
 
     # Task types and softmax variants
     if single_task:
