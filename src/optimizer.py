@@ -152,9 +152,9 @@ class MuonOptimizer(Optimizer):
 
                 state["step"] += 1
 
-                # Apply weight decay
+                # Apply weight decay (AdamW style)
                 if weight_decay != 0:
-                    grad = grad.add(p.data, alpha=weight_decay)
+                    p.data.add_(p.data, alpha=-weight_decay * group["lr"])
 
                 # Orthogonalize gradient updates if enabled
                 if use_orthogonal_updates and state["step"] > 1:
@@ -191,7 +191,7 @@ class MuonOptimizer(Optimizer):
                         adaptive_lr, p.data, spectral_norm_strength
                     )
 
-                # Update parameters
+                # Update parameters (AdamW-style update for now)
                 p.data.addcdiv_(
                     exp_avg,
                     bias_correction2_sqrt * torch.sqrt(exp_avg_sq)
@@ -208,8 +208,16 @@ class MuonOptimizer(Optimizer):
         self, current_grad: torch.Tensor, prev_grad: torch.Tensor
     ) -> torch.Tensor:
         """
-        Orthogonalize current gradient with respect to previous gradient
-        This promotes broader exploration by reducing redundancy in updates
+        Orthogonalize current gradient with respect to previous gradient.
+
+        This promotes broader exploration by reducing redundancy in updates.
+
+        Args:
+            current_grad: Current gradient tensor
+            prev_grad: Previous gradient tensor
+
+        Returns:
+            Orthogonalized gradient tensor
         """
         epsilon_threshold = 1e-8
         if torch.norm(prev_grad) < epsilon_threshold:
@@ -228,8 +236,17 @@ class MuonOptimizer(Optimizer):
         hessian_diag: torch.Tensor,
     ) -> torch.Tensor:
         """
-        Update diagonal Hessian approximation using gradient information
-        This provides second-order information for better update directions
+        Update diagonal Hessian approximation using gradient information.
+
+        This provides second-order information for better update directions.
+
+        Args:
+            grad: Current gradient tensor
+            exp_avg_sq: Exponential moving average of squared gradients
+            hessian_diag: Current diagonal Hessian approximation
+
+        Returns:
+            Updated diagonal Hessian approximation
         """
         # Simple diagonal Hessian approximation based on gradient magnitude
         # More sophisticated methods could be used here
@@ -243,8 +260,17 @@ class MuonOptimizer(Optimizer):
         self, adaptive_lr: torch.Tensor, param: torch.Tensor, strength: float
     ) -> torch.Tensor:
         """
-        Apply spectral norm constraint to prevent runaway weights
-        This keeps training stable and avoids "softmax collapse"
+        Apply spectral norm constraint to prevent runaway weights.
+
+        This keeps training stable and avoids "softmax collapse".
+
+        Args:
+            adaptive_lr: Adaptive learning rate tensor
+            param: Parameter tensor to constrain
+            strength: Strength of the spectral norm constraint
+
+        Returns:
+            Constrained adaptive learning rate tensor
         """
         min_dimensions_for_svd = 2
         # Compute spectral norm of the parameter

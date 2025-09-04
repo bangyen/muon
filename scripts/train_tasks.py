@@ -385,11 +385,12 @@ def run_comprehensive_experiments(
 
     # Optimizer configurations
     muon_config = {
-        "lr": 1e-3,
+        "lr": 5e-4,  # Match AdamW learning rate
         "betas": (0.9, 0.98),
-        "weight_decay": 1e-2,
-        "spectral_norm_strength": 0.1,
-        "second_order_interval": 10,
+        "weight_decay": 1e-2,  # Keep lower weight decay for Muon
+        "spectral_norm_strength": 0.0,  # Disable spectral norm for now
+        "second_order_interval": 1,  # Update every step
+        "use_orthogonal_updates": False,  # Disable orthogonal updates
     }
 
     adamw_config = {
@@ -400,10 +401,10 @@ def run_comprehensive_experiments(
 
     # Task types and softmax variants
     if single_task:
-        # Single task: only 1 task, 1 softmax, 2 optimizers = 2 experiments total
+        # Single task: only 1 task, 1 softmax, 1 optimizer = 1 experiment total
         task_types = ["exp"]  # Exponentiation is the hardest task
         softmax_variants = ["standard"]
-        optimizer_types = ["muon", "adamw"]
+        optimizer_types = ["muon"]
     else:
         # Full: all configurations
         task_types = ["gcd", "add", "div", "exp", "mul", "parity"]
