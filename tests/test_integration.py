@@ -60,7 +60,7 @@ class TestEndToEndTraining:
         train_losses = []
         val_losses = []
 
-        for epoch in range(num_epochs):
+        for _epoch in range(num_epochs):
             model.train()
             epoch_loss = 0.0
 
@@ -113,7 +113,7 @@ class TestEndToEndTraining:
                     val_total += targets.numel()
 
             avg_val_loss = val_loss / min(3, len(dataloader))
-            val_accuracy = val_correct / val_total if val_total > 0 else 0.0
+            val_correct / val_total if val_total > 0 else 0.0
             val_losses.append(avg_val_loss)
 
         # Check that training completed successfully
@@ -182,7 +182,7 @@ class TestEndToEndTraining:
         muon_losses = []
         adamw_losses = []
 
-        for epoch in range(3):
+        for _epoch in range(3):
             # Muon training
             model1.train()
             muon_epoch_loss = 0.0
@@ -560,7 +560,7 @@ class TestPerformanceBenchmarks:
         muon_losses = []
         adamw_losses = []
 
-        for epoch in range(5):
+        for _epoch in range(5):
             # Muon training
             model1.train()
             muon_epoch_loss = 0.0
@@ -646,7 +646,7 @@ class TestErrorHandling:
             max_seq_len=5,
         )
 
-        optimizer = MuonOptimizer(model.parameters(), lr=1e-3)
+        MuonOptimizer(model.parameters(), lr=1e-3)
         criterion = nn.CrossEntropyLoss(ignore_index=0)
 
         # Test with invalid input shapes
@@ -665,7 +665,7 @@ class TestErrorHandling:
             logits = logits.view(-1, logits.size(-1))
             targets = targets.view(-1)
 
-            loss = criterion(logits, targets)
+            criterion(logits, targets)
 
     def test_numerical_stability(self):
         """Test numerical stability during training"""

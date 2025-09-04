@@ -156,7 +156,7 @@ class TestTrainingDynamics:
 
         losses = []
 
-        for step in range(10):
+        for _step in range(10):
             x = torch.randn(32, 10)
             y = torch.randn(32, 5)
 
@@ -207,7 +207,7 @@ class TestOptimizerComparison:
         muon_losses = []
         adamw_losses = []
 
-        for step in range(20):
+        for _step in range(20):
             x = torch.randn(32, 10)
             y = torch.randn(32, 5)
 
@@ -362,7 +362,6 @@ class TestStatisticalAnalysis:
         n = len(epochs)
 
         # Calculate 95% confidence interval
-        confidence_level = 0.95
         z_score = 1.96  # For 95% confidence
 
         margin_of_error = z_score * (std_epoch / np.sqrt(n))

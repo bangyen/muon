@@ -166,6 +166,13 @@ line-ending = "auto"
     "S311",     # Standard random generators are acceptable in scripts
     "BLE001",   # Blind exception catching is acceptable in scripts
 ]
+"tests/**/*.py" = [
+    "PLR2004",  # Magic numbers acceptable in tests
+    "S101",     # Assert statements are acceptable in tests
+    "B007",     # Unused loop variables are acceptable in tests
+    "F841",     # Unused variables are acceptable in tests
+    "SLF001",   # Private member access is acceptable in tests
+]
 
 # Type checking configuration
 [tool.mypy]

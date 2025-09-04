@@ -132,7 +132,7 @@ class TestMuonOptimizer:
         # Perform multiple steps to test orthogonalization
         gradients = []
 
-        for step in range(5):
+        for _step in range(5):
             x = torch.randn(32, 10)
             y = torch.randn(32, 5)
 
@@ -292,7 +292,7 @@ class TestMuonVsAdamW:
         muon_losses = []
         adamw_losses = []
 
-        for step in range(20):
+        for _step in range(20):
             x = torch.randn(32, 10)
             y = torch.randn(32, 5)
 
@@ -349,7 +349,7 @@ class TestMuonVsAdamW:
         muon_changes = []
         adamw_changes = []
 
-        for step in range(10):
+        for _step in range(10):
             x = torch.randn(32, 10)
             y = torch.randn(32, 5)
 
@@ -412,7 +412,7 @@ class TestMuonVsAdamW:
         ortho_directions = []
         no_ortho_directions = []
 
-        for step in range(5):
+        for _step in range(5):
             x = torch.randn(32, 10)
             y = torch.randn(32, 5)
 

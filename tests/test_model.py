@@ -200,9 +200,9 @@ class TestTransformerModel:
         # Check that gradients exist for all parameters
         for name, param in model.named_parameters():
             assert param.grad is not None, f"No gradient for {name}"
-            assert torch.all(torch.isfinite(param.grad)), (
-                f"Non-finite gradient for {name}"
-            )
+            assert torch.all(
+                torch.isfinite(param.grad)
+            ), f"Non-finite gradient for {name}"
 
     def test_model_parameters(self):
         """Test that model has reasonable number of parameters"""
@@ -317,7 +317,7 @@ class TestSoftmaxVariants:
 
             # Check sparsity property (some probabilities should be exactly zero)
             # This is not always guaranteed, but should happen often
-            has_zeros = torch.any(probs == 0, dim=-1)
+            torch.any(probs == 0, dim=-1)
             # At least some samples should have zero probabilities
             # Note: This is not always guaranteed due to numerical precision
             # We'll just check that the function works without errors

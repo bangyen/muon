@@ -98,24 +98,21 @@ def create_test_model(config: dict[str, Any], device: torch.device):
     from src.model import GrokkingTransformer
 
     model = GrokkingTransformer(**config)
-    model = model.to(device)
-    return model
+    return model.to(device)
 
 
 def create_test_optimizer(model_params, config: dict[str, Any]):
     """Create a test optimizer with given configuration"""
     from src.optimizer import MuonOptimizer
 
-    optimizer = MuonOptimizer(model_params, **config)
-    return optimizer
+    return MuonOptimizer(model_params, **config)
 
 
 def create_test_dataset(task_type: str, config: dict[str, Any]):
     """Create a test dataset with given configuration"""
     from src.dataset import ModularArithmeticDataset
 
-    dataset = ModularArithmeticDataset(task_type, **config)
-    return dataset
+    return ModularArithmeticDataset(task_type, **config)
 
 
 def compute_accuracy(logits: torch.Tensor, targets: torch.Tensor) -> float:
@@ -138,10 +135,7 @@ def detect_grokking(
 
     # Find first epoch where validation accuracy reaches threshold
     for i, acc in enumerate(val_acc):
-        if acc >= threshold:
-            # Check if training accuracy has stabilized (close to 100%)
-            # Make sure we have enough training data and it's stabilized
-            if i < len(train_acc) and train_acc[i] >= 0.95:
-                return i
+        if acc >= threshold and i < len(train_acc) and train_acc[i] >= 0.95:
+            return i
 
     return -1  # No grokking detected
