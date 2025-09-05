@@ -64,9 +64,12 @@ class GrokkingTrainer:
         self.grokking_epoch = None
 
         # Softmax function
-        self.softmax_fn = getattr(
-            SoftmaxVariants, f"{config.softmax_variant}_softmax"
-        )
+        if config.softmax_variant == "stablemax":
+            self.softmax_fn = SoftmaxVariants.stablemax
+        elif config.softmax_variant == "sparsemax":
+            self.softmax_fn = SoftmaxVariants.sparsemax
+        else:  # standard
+            self.softmax_fn = SoftmaxVariants.standard_softmax
 
     def train_epoch(self) -> tuple[float, float]:
         """Train for one epoch"""
@@ -149,7 +152,7 @@ class GrokkingTrainer:
         self,
         max_epochs: int = 500,
         grokking_threshold: float = 0.95,
-        patience: int = 50,
+        patience: int = 100,  # Increased patience for delayed grokking
         quick_mode: bool = False,
     ) -> dict:
         """
@@ -169,7 +172,9 @@ class GrokkingTrainer:
 
         # Adjust patience for quick mode
         if quick_mode:
-            patience = min(patience, 20)  # More aggressive early stopping
+            patience = min(
+                patience, 50
+            )  # Less aggressive early stopping for delayed grokking
 
         print(f"Starting training with {self.softmax_variant} softmax...")
 
@@ -188,9 +193,8 @@ class GrokkingTrainer:
                 self.grokking_epoch = epoch
                 print(f"\nGrokking detected at epoch {epoch}!")
                 print(f"Validation accuracy: {val_acc:.4f}")
-                # Continue training for a few more epochs to ensure stability
-                if epoch < 5:  # Only stop early if grokking happens very early
-                    break
+                # Stop training immediately when grokking is detected
+                break
 
             # Early stopping (only if grokking hasn't been detected)
             if val_acc > best_val_acc:
@@ -369,43 +373,43 @@ def run_comprehensive_experiments(
     """
     # Use different model sizes based on mode
     if single_task:
-        # More challenging model for proper grokking
+        # Smaller model for faster epochs, delayed grokking
         model_config = {
-            "hidden_size": 96,  # Larger for more challenging grokking
-            "num_layers": 3,  # More layers for complexity
-            "num_heads": 6,  # More heads for attention
-            "ff_size": 384,  # Larger feedforward
-            "max_seq_len": 12,  # Longer sequences
-            "batch_size": 48,  # Larger batch
-            "dropout": 0.15,  # Higher dropout for regularization
-            "max_epochs": 300,  # More epochs for proper grokking
+            "hidden_size": 32,  # Much smaller for faster epochs
+            "num_layers": 2,  # Fewer layers for speed
+            "num_heads": 4,  # Fewer heads for speed
+            "ff_size": 128,  # Much smaller feedforward
+            "max_seq_len": 12,  # Keep same sequence length
+            "batch_size": 48,  # Keep same batch size
+            "dropout": 0.2,  # Higher dropout to delay grokking
+            "max_epochs": 1000,  # More epochs since grokking will be delayed
             "grokking_threshold": 0.95,  # Standard threshold
         }
     else:
-        # Full model for comprehensive experiments
+        # Smaller model for faster epochs, delayed grokking
         model_config = {
-            "hidden_size": 128,  # Reasonable model size for grokking
-            "num_layers": 4,  # Multiple layers for proper grokking
-            "num_heads": 8,  # Multiple attention heads
-            "ff_size": 512,  # Proper feedforward size
-            "max_seq_len": 15,  # Adequate sequence length
-            "batch_size": 64,  # Reasonable batch size
-            "dropout": 0.1,  # Standard dropout
-            "max_epochs": 500,  # Extended training for grokking
+            "hidden_size": 48,  # Much smaller for faster epochs
+            "num_layers": 2,  # Fewer layers for speed
+            "num_heads": 4,  # Fewer heads for speed
+            "ff_size": 192,  # Much smaller feedforward
+            "max_seq_len": 15,  # Keep same sequence length
+            "batch_size": 64,  # Keep same batch size
+            "dropout": 0.2,  # Higher dropout to delay grokking
+            "max_epochs": 1000,  # More epochs since grokking will be delayed
             "grokking_threshold": 0.95,  # Match paper threshold
         }
 
-    # Optimizer configurations - based on paper findings
+    # Optimizer configurations - adjusted to delay grokking
     muon_config = {
-        "lr": 0.0005,  # More conservative learning rate for grokking
+        "lr": 0.0001,  # Much lower learning rate to delay grokking
         "betas": (0.9, 0.95),  # For non-hidden parameters
-        "weight_decay": 1e-2,  # Weight decay for both groups
+        "weight_decay": 5e-2,  # Higher weight decay to delay grokking
     }
 
     adamw_config = {
-        "lr": 0.0008,  # Slightly higher LR for AdamW
+        "lr": 0.0002,  # Lower learning rate to delay grokking
         "betas": (0.9, 0.98),
-        "weight_decay": 1e-2,  # Standard weight decay for grokking
+        "weight_decay": 5e-2,  # Higher weight decay to delay grokking
     }
 
     # Task types and softmax variants
