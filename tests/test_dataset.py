@@ -364,8 +364,9 @@ class TestDatasetIntegration:
         """Test dataset integration with optimizer"""
         set_seed(42)
 
+        from muon import SingleDeviceMuonWithAuxAdam
+
         from src.model import GrokkingTransformer
-        from src.optimizer import MuonOptimizer
 
         # Create dataset, model, and optimizer
         dataset = ModularArithmeticDataset("add", modulus=97)
@@ -377,7 +378,27 @@ class TestDatasetIntegration:
             ff_size=128,
             max_seq_len=10,
         )
-        optimizer = MuonOptimizer(model.parameters())
+
+        # Separate parameters for Muon
+        hidden_weights = [p for p in model.parameters() if p.ndim >= 2]
+        other_params = [p for p in model.parameters() if p.ndim < 2]
+
+        param_groups = [
+            dict(
+                params=hidden_weights,
+                use_muon=True,
+                lr=1e-3,
+                weight_decay=1e-2,
+            ),
+            dict(
+                params=other_params,
+                use_muon=False,
+                lr=1e-4,
+                betas=(0.9, 0.95),
+                weight_decay=1e-2,
+            ),
+        ]
+        optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
 
         # Test training step
         sample = dataset[0]

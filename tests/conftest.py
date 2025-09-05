@@ -103,9 +103,28 @@ def create_test_model(config: dict[str, Any], device: torch.device):
 
 def create_test_optimizer(model_params, config: dict[str, Any]):
     """Create a test optimizer with given configuration"""
-    from src.optimizer import MuonOptimizer
+    from muon import SingleDeviceMuonWithAuxAdam
 
-    return MuonOptimizer(model_params, **config)
+    # Separate parameters for Muon
+    hidden_weights = [p for p in model_params if p.ndim >= 2]
+    other_params = [p for p in model_params if p.ndim < 2]
+
+    param_groups = [
+        dict(
+            params=hidden_weights,
+            use_muon=True,
+            lr=config.get("lr", 1e-3),
+            weight_decay=config.get("weight_decay", 1e-2),
+        ),
+        dict(
+            params=other_params,
+            use_muon=False,
+            lr=config.get("lr", 1e-3) * 0.1,
+            betas=(0.9, 0.95),
+            weight_decay=config.get("weight_decay", 1e-2),
+        ),
+    ]
+    return SingleDeviceMuonWithAuxAdam(param_groups)
 
 
 def create_test_dataset(task_type: str, config: dict[str, Any]):

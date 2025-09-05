@@ -102,14 +102,14 @@ pytest tests/test_integration.py -v
 # Run all tests
 pytest tests/
 
-# Run specific test file
-pytest tests/test_optimizer.py
+# Run integration tests
+pytest tests/test_integration.py
 
-# Run specific test class
-pytest tests/test_optimizer.py::TestMuonOptimizer
+# Run dataset tests
+pytest tests/test_dataset.py
 
-# Run specific test method
-pytest tests/test_optimizer.py::TestMuonOptimizer::test_initialization
+# Run model tests
+pytest tests/test_model.py
 
 # Run tests matching pattern
 pytest -k "grokking"
@@ -170,7 +170,8 @@ Based on the paper "Muon Optimizer Accelerates Grokking", tests should validate:
 pytest -vvv tests/
 
 # Run single test with debug output
-pytest -s tests/test_optimizer.py::TestMuonOptimizer::test_initialization
+# Run with verbose output
+pytest -s tests/test_integration.py
 ```
 
 ## Contributing

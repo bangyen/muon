@@ -119,7 +119,7 @@ Based on the paper, you should see:
 ### Single Experiment
 
 ```python
-from src.optimizer import MuonOptimizer
+from muon import SingleDeviceMuonWithAuxAdam
 from src.model import GrokkingTransformer
 from src.dataset import ModularArithmeticDataset
 
@@ -129,13 +129,15 @@ dataset = ModularArithmeticDataset('add', modulus=97, train_split=0.8)
 # Create model
 model = GrokkingTransformer(vocab_size=dataset.vocab_size)
 
-# Create Muon optimizer
-optimizer = MuonOptimizer(
-    model.parameters(),
-    lr=1e-3,
-    spectral_norm_strength=0.1,
-    second_order_interval=10
-)
+# Create Muon optimizer with proper parameter grouping
+hidden_weights = [p for p in model.parameters() if p.ndim >= 2]
+other_params = [p for p in model.parameters() if p.ndim < 2]
+
+param_groups = [
+    dict(params=hidden_weights, use_muon=True, lr=0.02, weight_decay=1e-2),
+    dict(params=other_params, use_muon=False, lr=0.002, betas=(0.9, 0.95), weight_decay=1e-2)
+]
+optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
 ```
 
 ### Custom Configuration
@@ -156,11 +158,9 @@ model_config = {
 
 # Custom Muon configuration
 muon_config = {
-    'lr': 5e-4,
-    'betas': (0.9, 0.95),
+    'lr': 0.02,  # Learning rate for Muon parameters
     'weight_decay': 5e-3,
-    'spectral_norm_strength': 0.05,
-    'second_order_interval': 5
+    'betas': (0.9, 0.95),  # For AdamW parameters
 }
 ```
 
@@ -168,24 +168,15 @@ muon_config = {
 
 The implementation supports various ablation studies:
 
-### Spectral Norm Strength
+### Learning Rate
 ```python
-# Test different spectral norm strengths
-for strength in [0.0, 0.05, 0.1, 0.2]:
-    optimizer = MuonOptimizer(
-        model.parameters(),
-        spectral_norm_strength=strength
-    )
-```
-
-### Second-Order Interval
-```python
-# Test different update frequencies
-for interval in [1, 5, 10, 20]:
-    optimizer = MuonOptimizer(
-        model.parameters(),
-        second_order_interval=interval
-    )
+# Test different learning rates for Muon parameters
+for lr in [0.01, 0.02, 0.05]:
+    param_groups = [
+        dict(params=hidden_weights, use_muon=True, lr=lr, weight_decay=1e-2),
+        dict(params=other_params, use_muon=False, lr=lr*0.1, betas=(0.9, 0.95), weight_decay=1e-2)
+    ]
+    optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
 ```
 
 ### Softmax Variants
