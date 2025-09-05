@@ -46,9 +46,6 @@ run-single: ## Run quick single task test
 
 LATEST_RESULTS = $(shell ls -t results/experiment_results_*.json | head -1)
 
-visualize: ## Create visualizations from results
-	python -m scripts.visualize_results --results_file $(LATEST_RESULTS)
-
 analyze: ## Analyze experiment results with statistical tests
 	python -m scripts.analyze_results --results_file $(LATEST_RESULTS) --detailed
 

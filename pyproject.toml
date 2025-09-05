@@ -23,13 +23,10 @@ classifiers = [
 dependencies = [
     "torch>=2.0.0",
     "numpy>=1.21.0",
-    "matplotlib>=3.5.0",
-    "seaborn>=0.11.0",
     "pandas>=1.3.0",
     "scipy>=1.7.0",
     "tqdm>=4.62.0",
-    "plotly>=5.0.0",
-    "jupyter>=1.0.0",
+    "tabulate>=0.9.0",
     "muon-optimizer @ git+https://github.com/KellerJordan/Muon",
 ]
 
@@ -39,7 +36,6 @@ dependencies = [
 
 [project.scripts]
 muon-train = "scripts.train_tasks:main"
-muon-visualize = "scripts.visualize_results:main"
 muon-analyze = "scripts.analyze_results:main"
 
 [project.optional-dependencies]

@@ -12,6 +12,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from scipy import stats
+from tabulate import tabulate
 
 # Suppress scipy precision warnings for statistical tests
 warnings.filterwarnings(
@@ -99,7 +100,7 @@ def analyze_grokking_results(results: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def print_analysis_results(analysis: dict[str, Any]) -> None:
-    """Print analysis results in a formatted way"""
+    """Print analysis results in a formatted way using tabulate"""
     if "error" in analysis:
         print(f"Error: {analysis['error']}")
         return
@@ -112,41 +113,88 @@ def print_analysis_results(analysis: dict[str, Any]) -> None:
     adamw_stats = analysis["adamw_stats"]
     comparison = analysis["comparison"]
 
-    print("\nMuon Optimizer:")
-    print(f"  Mean grokking epoch: {muon_stats['mean_grokking_epoch']:.2f}")
-    print(f"  Std grokking epoch:  {muon_stats['std_grokking_epoch']:.2f}")
-    print(f"  N experiments:      {muon_stats['n_experiments']}")
+    # Create optimizer comparison table
+    optimizer_data = [
+        [
+            "Muon Optimizer",
+            f"{muon_stats['mean_grokking_epoch']:.2f}",
+            f"{muon_stats['std_grokking_epoch']:.2f}",
+            muon_stats["n_experiments"],
+        ],
+        [
+            "AdamW Optimizer",
+            f"{adamw_stats['mean_grokking_epoch']:.2f}",
+            f"{adamw_stats['std_grokking_epoch']:.2f}",
+            adamw_stats["n_experiments"],
+        ],
+    ]
 
-    print("\nAdamW Optimizer:")
-    print(f"  Mean grokking epoch: {adamw_stats['mean_grokking_epoch']:.2f}")
-    print(f"  Std grokking epoch:  {adamw_stats['std_grokking_epoch']:.2f}")
-    print(f"  N experiments:      {adamw_stats['n_experiments']}")
+    optimizer_headers = [
+        "Optimizer",
+        "Mean Grokking Epoch",
+        "Std Grokking Epoch",
+        "N Experiments",
+    ]
+    print("\nOptimizer Comparison:")
+    print(
+        tabulate(
+            optimizer_data, headers=optimizer_headers, tablefmt="fancy_grid"
+        )
+    )
+
+    # Create statistical comparison table
+    stats_data = [
+        ["T-statistic", f"{comparison['t_statistic']:.4f}"],
+        ["P-value", f"{comparison['p_value']:.2e}"],
+        ["Cohen's d", f"{comparison['cohens_d']:.4f}"],
+        ["Speedup", f"{comparison['speedup']:.2f}x"],
+        ["Significant", "Yes" if comparison["significant"] else "No"],
+    ]
 
     print("\nStatistical Comparison:")
-    print(f"  T-statistic: {comparison['t_statistic']:.4f}")
-    print(f"  P-value:     {comparison['p_value']:.2e}")
-    print(f"  Cohen's d:   {comparison['cohens_d']:.4f}")
-    print(f"  Speedup:     {comparison['speedup']:.2f}x")
-    print(f"  Significant: {'Yes' if comparison['significant'] else 'No'}")
+    print(
+        tabulate(
+            stats_data, headers=["Metric", "Value"], tablefmt="fancy_grid"
+        )
+    )
 
-    print("\nComparison with Paper Results:")
+    # Create paper comparison table
     paper_muon_mean = 102.89
     paper_adamw_mean = 153.09
     paper_t_stat = 5.0175
     paper_p_value = 6.33e-08
 
-    print(f"  Paper Muon mean:    {paper_muon_mean:.2f}")
-    print(f"  Our Muon mean:      {muon_stats['mean_grokking_epoch']:.2f}")
-    print(f"  Paper AdamW mean:   {paper_adamw_mean:.2f}")
-    print(f"  Our AdamW mean:     {adamw_stats['mean_grokking_epoch']:.2f}")
-    print(f"  Paper t-statistic:  {paper_t_stat:.4f}")
-    print(f"  Our t-statistic:    {comparison['t_statistic']:.4f}")
-    print(f"  Paper p-value:      {paper_p_value:.2e}")
-    print(f"  Our p-value:        {comparison['p_value']:.2e}")
+    comparison_data = [
+        [
+            "Muon Mean",
+            f"{paper_muon_mean:.2f}",
+            f"{muon_stats['mean_grokking_epoch']:.2f}",
+        ],
+        [
+            "AdamW Mean",
+            f"{paper_adamw_mean:.2f}",
+            f"{adamw_stats['mean_grokking_epoch']:.2f}",
+        ],
+        [
+            "T-statistic",
+            f"{paper_t_stat:.4f}",
+            f"{comparison['t_statistic']:.4f}",
+        ],
+        ["P-value", f"{paper_p_value:.2e}", f"{comparison['p_value']:.2e}"],
+    ]
+
+    print("\nComparison with Paper Results:")
+    print(
+        tabulate(
+            comparison_data,
+            headers=["Metric", "Paper", "Our Results"],
+            tablefmt="fancy_grid",
+        )
+    )
 
 
 def analyze_by_task_and_softmax(results: list[dict[str, Any]]) -> None:
-    """Analyze results broken down by task and softmax variant"""
+    """Analyze results broken down by task and softmax variant using tabulate"""
     df = pd.DataFrame(results)
     grokking_results = df[df["grokking_epoch"].notna()].copy()
 
@@ -158,12 +206,12 @@ def analyze_by_task_and_softmax(results: list[dict[str, Any]]) -> None:
     print("BREAKDOWN BY TASK AND SOFTMAX VARIANT")
     print("=" * 60)
 
+    breakdown_data = []
+
     for task in grokking_results["task_type"].unique():
-        print(f"\nTask: {task}")
         task_results = grokking_results[grokking_results["task_type"] == task]
 
         for softmax in task_results["softmax_variant"].unique():
-            print(f"  Softmax: {softmax}")
             softmax_results = task_results[
                 task_results["softmax_variant"] == softmax
             ]
@@ -182,11 +230,29 @@ def analyze_by_task_and_softmax(results: list[dict[str, Any]]) -> None:
                     adamw_mean / muon_mean if muon_mean > 0 else float("inf")
                 )
 
-                print(f"    Muon mean:   {muon_mean:.2f}")
-                print(f"    AdamW mean:  {adamw_mean:.2f}")
-                print(f"    Speedup:    {speedup:.2f}x")
+                breakdown_data.append(
+                    [
+                        task,
+                        softmax,
+                        f"{muon_mean:.2f}",
+                        f"{adamw_mean:.2f}",
+                        f"{speedup:.2f}x",
+                    ]
+                )
             else:
-                print("    Missing data for one optimizer")
+                breakdown_data.append(
+                    [task, softmax, "N/A", "N/A", "Missing data"]
+                )
+
+    if breakdown_data:
+        headers = [
+            "Task",
+            "Softmax Variant",
+            "Muon Mean",
+            "AdamW Mean",
+            "Speedup",
+        ]
+        print(tabulate(breakdown_data, headers=headers, tablefmt="fancy_grid"))
 
 
 def main():
