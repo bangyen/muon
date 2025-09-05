@@ -304,6 +304,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
             ),
         ]
         optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
+    else:
         optimizer = optim.AdamW(
             model.parameters(),
             lr=config.optimizer_config["lr"],
