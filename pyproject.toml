@@ -27,6 +27,7 @@ dependencies = [
     "tqdm>=4.62.0",
     "plotly>=5.0.0",
     "jupyter>=1.0.0",
+    "muon-optimizer @ git+https://github.com/KellerJordan/Muon",
 ]
 
 [project.optional-dependencies]
