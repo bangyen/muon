@@ -1,5 +1,5 @@
 [project]
-name = "muon-optimizer"
+name = "muon-grokking-reproduction"
 version = "0.1.0"
 description = "Muon Optimizer: Accelerating Grokking Reproduction"
 authors = [
@@ -7,6 +7,8 @@ authors = [
 ]
 readme = "README.md"
 requires-python = ">=3.9"
+license = {text = "MIT"}
+keywords = ["machine-learning", "optimization", "grokking", "transformer", "muon"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -16,6 +18,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Mathematics",
 ]
 dependencies = [
     "torch>=2.0.0",
@@ -30,6 +33,17 @@ dependencies = [
     "muon-optimizer @ git+https://github.com/KellerJordan/Muon",
 ]
 
+[project.urls]
+Homepage = "https://github.com/bangyen/muon-grokking-reproduction"
+Repository = "https://github.com/bangyen/muon-grokking-reproduction"
+Issues = "https://github.com/bangyen/muon-grokking-reproduction/issues"
+"Original Paper" = "https://arxiv.org/pdf/2504.16041"
+"Original Muon" = "https://github.com/KellerJordan/Muon"
+
+[project.scripts]
+muon-train = "scripts.train_tasks:main"
+muon-visualize = "scripts.visualize_results:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
@@ -41,6 +55,9 @@ dev = [
     "types-PyYAML",
     "build",
     "twine",
+]
+gpu = [
+    "torch[cuda]>=2.0.0",
 ]
 
 [build-system]
