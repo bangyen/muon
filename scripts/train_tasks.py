@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import torch
 from muon import SingleDeviceMuonWithAuxAdam
+from tabulate import tabulate
 from torch import nn, optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -349,7 +350,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
 
 def run_comprehensive_experiments(
     device: str = "cpu", num_runs: int = 3, single_task: bool = False
-) -> list[dict]:
+) -> tuple[list[dict], list[dict]]:
     """
     Run comprehensive experiments as described in the paper
 
@@ -359,7 +360,8 @@ def run_comprehensive_experiments(
         single_task: Run only one task for the fastest possible test
 
     Returns:
-        List of experiment results
+        Tuple of (all_results, summary_results) where summary_results contains
+        aggregated data for table display
     """
     if single_task:
         model_config = {
@@ -382,7 +384,7 @@ def run_comprehensive_experiments(
             "max_seq_len": 10,
             "batch_size": 32,
             "dropout": 0.2,
-            "max_epochs": 1000,
+            "max_epochs": 100,
             "grokking_threshold": 0.95,
         }
 
@@ -404,21 +406,12 @@ def run_comprehensive_experiments(
     if single_task:
         task_types = ["exp"]
         softmax_variants = ["standard"]
-        optimizer_types = ["muon", "adamw"]
     else:
         task_types = ["gcd", "add", "div", "exp", "mul", "parity"]
         softmax_variants = ["standard", "stablemax", "sparsemax"]
-        optimizer_types = ["muon", "adamw"]
 
     all_results = []
-
-    total_experiments = (
-        len(task_types)
-        * len(softmax_variants)
-        * len(optimizer_types)
-        * num_runs
-    )
-    print(f"🚀 Running {total_experiments} experiments ({num_runs} runs each)")
+    summary_results = []
 
     for task_type in task_types:
         for softmax_variant in softmax_variants:
@@ -445,24 +438,6 @@ def run_comprehensive_experiments(
                 muon_results.append(results)
                 all_results.append(results)
 
-            # Muon summary
-            muon_grokking = [
-                r["grokking_epoch"]
-                for r in muon_results
-                if r["grokking_epoch"] is not None
-            ]
-            muon_success_rate = len(muon_grokking) / len(muon_results) * 100
-            if muon_grokking:
-                muon_avg = sum(muon_grokking) / len(muon_grokking)
-                grokking_epochs = [str(epoch) for epoch in muon_grokking]
-                print(
-                    f"📈 Muon: {muon_success_rate:.0f}% success, epochs: [{', '.join(grokking_epochs)}] (avg: {muon_avg:.1f})"
-                )
-            else:
-                print(
-                    f"📈 Muon: {muon_success_rate:.0f}% success, no grokking achieved"
-                )
-
             # Run all AdamW experiments
             print("\n--- AdamW Optimizer ---")
             adamw_results = []
@@ -484,25 +459,7 @@ def run_comprehensive_experiments(
                 adamw_results.append(results)
                 all_results.append(results)
 
-            # AdamW summary
-            adamw_grokking = [
-                r["grokking_epoch"]
-                for r in adamw_results
-                if r["grokking_epoch"] is not None
-            ]
-            adamw_success_rate = len(adamw_grokking) / len(adamw_results) * 100
-            if adamw_grokking:
-                adamw_avg = sum(adamw_grokking) / len(adamw_grokking)
-                grokking_epochs = [str(epoch) for epoch in adamw_grokking]
-                print(
-                    f"📈 AdamW: {adamw_success_rate:.0f}% success, epochs: [{', '.join(grokking_epochs)}] (avg: {adamw_avg:.1f})"
-                )
-            else:
-                print(
-                    f"📈 AdamW: {adamw_success_rate:.0f}% success, no grokking achieved"
-                )
-
-            # Show comparison for this task/variant
+            # Collect summary data for this task/variant
             muon_grokking = [
                 r["grokking_epoch"]
                 for r in muon_results
@@ -514,29 +471,35 @@ def run_comprehensive_experiments(
                 if r["grokking_epoch"] is not None
             ]
 
-            if muon_grokking and adamw_grokking:
-                muon_avg = sum(muon_grokking) / len(muon_grokking)
-                adamw_avg = sum(adamw_grokking) / len(adamw_grokking)
-                speedup = adamw_avg / muon_avg
-                print(
-                    f"\n📊 Comparison: Muon {muon_avg:.1f} epochs vs AdamW {adamw_avg:.1f} epochs (speedup: {speedup:.1f}x)"
-                )
-            elif muon_grokking:
-                muon_avg = sum(muon_grokking) / len(muon_grokking)
-                print(
-                    f"\n📊 Muon grokked in {muon_avg:.1f} epochs, AdamW failed to grok"
-                )
-            elif adamw_grokking:
-                adamw_avg = sum(adamw_grokking) / len(adamw_grokking)
-                print(
-                    f"\n📊 AdamW grokked in {adamw_avg:.1f} epochs, Muon failed to grok"
-                )
-            else:
-                print(
-                    "\n📊 Neither optimizer achieved grokking for this configuration"
-                )
+            muon_success_rate = len(muon_grokking) / len(muon_results) * 100
+            adamw_success_rate = len(adamw_grokking) / len(adamw_results) * 100
 
-    return all_results
+            # Add summary data
+            summary_results.append(
+                {
+                    "Task": task_type.upper(),
+                    "Softmax": softmax_variant.upper(),
+                    "Muon Success Rate": f"{muon_success_rate:.0f}%",
+                    "Muon Avg Epochs": f"{sum(muon_grokking) / len(muon_grokking):.1f}"
+                    if muon_grokking
+                    else "N/A",
+                    "Muon Grokking Epochs": f"[{', '.join(map(str, muon_grokking))}]"
+                    if muon_grokking
+                    else "None",
+                    "AdamW Success Rate": f"{adamw_success_rate:.0f}%",
+                    "AdamW Avg Epochs": f"{sum(adamw_grokking) / len(adamw_grokking):.1f}"
+                    if adamw_grokking
+                    else "N/A",
+                    "AdamW Grokking Epochs": f"[{', '.join(map(str, adamw_grokking))}]"
+                    if adamw_grokking
+                    else "None",
+                    "Speedup": f"{sum(adamw_grokking) / len(adamw_grokking) / (sum(muon_grokking) / len(muon_grokking)):.1f}x"
+                    if muon_grokking and adamw_grokking
+                    else "N/A",
+                }
+            )
+
+    return all_results, summary_results
 
 
 def save_results(results: list[dict], output_dir: str = "results"):
@@ -572,8 +535,6 @@ def save_results(results: list[dict], output_dir: str = "results"):
     )
     df.to_csv(summary_file, index=False)
 
-    print(f"💾 Results saved to {output_dir}/")
-
     return df
 
 
@@ -607,40 +568,162 @@ def main():
     args = parser.parse_args()
 
     if args.quick_test:
-        results = run_comprehensive_experiments(device=args.device, num_runs=1)
+        results, summary_results = run_comprehensive_experiments(
+            device=args.device, num_runs=1
+        )
     elif args.single_task:
-        results = run_comprehensive_experiments(
+        results, summary_results = run_comprehensive_experiments(
             device=args.device, num_runs=args.num_runs, single_task=True
         )
     else:
-        results = run_comprehensive_experiments(
+        results, summary_results = run_comprehensive_experiments(
             device=args.device, num_runs=args.num_runs
         )
 
-    df = save_results(results, args.output_dir)
+    save_results(results, args.output_dir)
 
-    print("\n📊 FINAL RESULTS")
-    print("=" * 30)
+    # Group results by task
+    task_groups = {}
+    for summary in summary_results:
+        task = summary["Task"]
+        if task not in task_groups:
+            task_groups[task] = []
+        task_groups[task].append(summary)
 
-    muon_results = df[df["optimizer_type"] == "muon"]
-    adamw_results = df[df["optimizer_type"] == "adamw"]
+    # Create summary table for each task
+    for task, summaries in task_groups.items():
+        print(f"\n=== {task} TASK SUMMARY ===")
 
-    if len(muon_results) > 0 and len(adamw_results) > 0:
-        muon_grokking = muon_results["grokking_epoch"].dropna()
-        adamw_grokking = adamw_results["grokking_epoch"].dropna()
+        # Calculate averages across softmax variants for this task
+        muon_success_rates = []
+        muon_avg_epochs = []
+        adamw_success_rates = []
+        adamw_avg_epochs = []
+        speedups = []
 
-        if len(muon_grokking) > 0 and len(adamw_grokking) > 0:
-            muon_avg = muon_grokking.mean()
-            adamw_avg = adamw_grokking.mean()
-            speedup = adamw_avg / muon_avg if muon_avg > 0 else float("inf")
+        for summary in summaries:
+            if summary["Muon Avg Epochs"] != "N/A":
+                muon_success_rates.append(
+                    float(summary["Muon Success Rate"].rstrip("%"))
+                )
+                muon_avg_epochs.append(float(summary["Muon Avg Epochs"]))
+            if summary["AdamW Avg Epochs"] != "N/A":
+                adamw_success_rates.append(
+                    float(summary["AdamW Success Rate"].rstrip("%"))
+                )
+                adamw_avg_epochs.append(float(summary["AdamW Avg Epochs"]))
+            if summary["Speedup"] != "N/A":
+                speedups.append(float(summary["Speedup"].rstrip("x")))
 
-            print(f"⚡ Muon: {muon_avg:.1f} epochs")
-            print(f"🐌 AdamW: {adamw_avg:.1f} epochs")
-            print(f"🚀 Speedup: {speedup:.1f}x")
-        else:
-            print("⚠️  No grokking detected in some configurations")
+        # Calculate speedup (AdamW epochs / Muon epochs)
+        muon_avg = (
+            sum(muon_avg_epochs) / len(muon_avg_epochs)
+            if muon_avg_epochs
+            else 0
+        )
+        adamw_avg = (
+            sum(adamw_avg_epochs) / len(adamw_avg_epochs)
+            if adamw_avg_epochs
+            else 0
+        )
+        muon_speedup = adamw_avg / muon_avg if muon_avg > 0 else 0
 
-    print(f"✅ {len(results)} experiments completed")
+        # Create task summary table
+        task_table = [
+            ["Metric", "Muon", "AdamW"],
+            [
+                "Success Rate",
+                f"{sum(muon_success_rates)/len(muon_success_rates):.0f}%"
+                if muon_success_rates
+                else "N/A",
+                f"{sum(adamw_success_rates)/len(adamw_success_rates):.0f}%"
+                if adamw_success_rates
+                else "N/A",
+            ],
+            [
+                "Avg Epochs",
+                f"{muon_avg:.1f}" if muon_avg_epochs else "N/A",
+                f"{adamw_avg:.1f}" if adamw_avg_epochs else "N/A",
+            ],
+            [
+                "Speedup",
+                f"{muon_speedup:.1f}x"
+                if muon_avg > 0 and adamw_avg > 0
+                else "N/A",
+                "1.0x",
+            ],
+        ]
+
+        print(tabulate(task_table, headers="firstrow", tablefmt="fancy_grid"))
+
+    # Overall summary across all tasks (only show if multiple tasks)
+    if len(task_groups) > 1:
+        print("\n=== OVERALL SUMMARY ===")
+
+        # Calculate overall averages
+        all_muon_success = []
+        all_muon_epochs = []
+        all_adamw_success = []
+        all_adamw_epochs = []
+        all_speedups = []
+
+        for summary in summary_results:
+            if summary["Muon Avg Epochs"] != "N/A":
+                all_muon_success.append(
+                    float(summary["Muon Success Rate"].rstrip("%"))
+                )
+                all_muon_epochs.append(float(summary["Muon Avg Epochs"]))
+            if summary["AdamW Avg Epochs"] != "N/A":
+                all_adamw_success.append(
+                    float(summary["AdamW Success Rate"].rstrip("%"))
+                )
+                all_adamw_epochs.append(float(summary["AdamW Avg Epochs"]))
+            if summary["Speedup"] != "N/A":
+                all_speedups.append(float(summary["Speedup"].rstrip("x")))
+
+        # Calculate overall speedup
+        overall_muon_avg = (
+            sum(all_muon_epochs) / len(all_muon_epochs)
+            if all_muon_epochs
+            else 0
+        )
+        overall_adamw_avg = (
+            sum(all_adamw_epochs) / len(all_adamw_epochs)
+            if all_adamw_epochs
+            else 0
+        )
+        overall_muon_speedup = (
+            overall_adamw_avg / overall_muon_avg if overall_muon_avg > 0 else 0
+        )
+
+        overall_table = [
+            ["Metric", "Muon", "AdamW"],
+            [
+                "Success Rate",
+                f"{sum(all_muon_success)/len(all_muon_success):.0f}%"
+                if all_muon_success
+                else "N/A",
+                f"{sum(all_adamw_success)/len(all_adamw_success):.0f}%"
+                if all_adamw_success
+                else "N/A",
+            ],
+            [
+                "Avg Epochs",
+                f"{overall_muon_avg:.1f}" if all_muon_epochs else "N/A",
+                f"{overall_adamw_avg:.1f}" if all_adamw_epochs else "N/A",
+            ],
+            [
+                "Speedup",
+                f"{overall_muon_speedup:.1f}x"
+                if overall_muon_avg > 0 and overall_adamw_avg > 0
+                else "N/A",
+                "1.0x",
+            ],
+        ]
+
+        print(
+            tabulate(overall_table, headers="firstrow", tablefmt="fancy_grid")
+        )
 
 
 if __name__ == "__main__":
