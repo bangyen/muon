@@ -399,11 +399,11 @@ def run_comprehensive_experiments(
             "grokking_threshold": 0.95,  # Match paper threshold
         }
 
-    # Optimizer configurations - adjusted to delay grokking
+    # Optimizer configurations - balanced Muon learning rates
     muon_config = {
-        "lr": 0.0001,  # Much lower learning rate to delay grokking
+        "lr": 0.002,  # Balanced Muon learning rate (between 0.0001 and 0.01)
         "betas": (0.9, 0.95),  # For non-hidden parameters
-        "weight_decay": 5e-2,  # Higher weight decay to delay grokking
+        "weight_decay": 1e-2,  # Moderate weight decay
     }
 
     adamw_config = {
