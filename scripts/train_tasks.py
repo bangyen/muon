@@ -566,9 +566,14 @@ def main():
         if len(muon_grokking) > 0 and len(adamw_grokking) > 0:
             print(f"Muon average grokking epoch: {muon_grokking.mean():.2f}")
             print(f"AdamW average grokking epoch: {adamw_grokking.mean():.2f}")
-            print(
-                f"Speedup: {adamw_grokking.mean() / muon_grokking.mean():.2f}x"
-            )
+
+            # Handle division by zero when Muon achieves grokking at epoch 0
+            if muon_grokking.mean() == 0:
+                print("Speedup: ∞x (Muon achieves immediate grokking)")
+            else:
+                print(
+                    f"Speedup: {adamw_grokking.mean() / muon_grokking.mean():.2f}x"
+                )
         else:
             print("No grokking detected in some configurations")
 
