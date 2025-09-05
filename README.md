@@ -30,33 +30,35 @@ source venv/bin/activate
 pip install -e .
 ```
 
-### Run Quick Test
+### Using Makefile (Recommended)
+
+```bash
+# Run quick single task test
+make run-single
+
+# Run comprehensive experiments
+make run-experiments
+
+# Analyze latest results
+make analyze
+
+# See all available commands
+make help
+```
+
+### Manual Commands
 
 ```bash
 # Run a quick test with limited configurations
 python -m scripts.train_tasks --single_task --device cpu
-```
 
-### Run Full Experiments
-
-```bash
 # Run comprehensive experiments (takes several hours)
 python -m scripts.train_tasks --device cpu --num_runs 3
-```
 
-### Analyze Results
-
-```bash
 # Perform statistical analysis matching the paper
-python -m scripts.analyze_results --results_file results/experiment_results_YYYYMMDD_HHMMSS.json
+python -m scripts.analyze_results --results_file results/experiment_results_YYYYMMDD_HHMMSS.json --detailed
 ```
 
-### Visualize Results
-
-```bash
-# Create visualizations matching paper figures
-python -m scripts.visualize_results --results_file results/experiment_results_YYYYMMDD_HHMMSS.json
-```
 
 ## 📁 Project Structure
 
@@ -68,13 +70,13 @@ muon/
 │   └── dataset.py        # Modular arithmetic datasets (exact paper configs)
 ├── scripts/
 │   ├── train_tasks.py    # Main training script (faithful to paper methodology)
-│   ├── visualize_results.py  # Visualization matching paper figures
 │   └── analyze_results.py   # Statistical analysis matching paper results
 ├── tests/
 │   ├── test_model.py     # Model architecture tests
 │   └── test_dataset.py   # Dataset functionality tests
 ├── results/              # Experiment results (JSON + CSV)
-├── pyproject.toml         # Project configuration
+├── Makefile              # Build and development commands
+├── pyproject.toml         # Project configuration (includes mypy settings)
 └── README.md            # This file
 ```
 
@@ -216,14 +218,20 @@ for lr in [0.01, 0.02, 0.05]:
 softmax_variants = ['standard', 'stablemax', 'sparsemax']
 ```
 
-## 📈 Visualization
 
-The visualization script generates:
+## 📈 Analysis and Results
 
-1. **Grokking Comparison**: Box plots and violin plots comparing Muon vs AdamW
-2. **Learning Curves**: Training and validation accuracy over time
-3. **Ablation Studies**: Effect of different components
-4. **Summary Tables**: Statistical summaries and success rates
+The analysis script provides:
+
+1. **Statistical Analysis**: T-test comparison of Muon vs AdamW grokking epochs
+2. **Summary Statistics**: Mean, standard deviation, and success rates
+3. **Task Breakdown**: Results broken down by task and softmax variant
+4. **Detailed Reports**: Comprehensive statistical analysis matching paper methodology
+
+```bash
+# Perform statistical analysis matching the paper
+python -m scripts.analyze_results --results_file results/experiment_results_YYYYMMDD_HHMMSS.json --detailed
+```
 
 ## 🧪 Experimental Setup
 
