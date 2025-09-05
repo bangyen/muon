@@ -30,6 +30,7 @@ class TrainerConfig:
     val_data: list[dict]
     device: str = "cpu"
     softmax_variant: str = "standard"
+    run_number: int = 1
 
 
 class GrokkingTrainer:
@@ -51,6 +52,7 @@ class GrokkingTrainer:
         self.val_data = config.val_data
         self.device = config.device
         self.softmax_variant = config.softmax_variant
+        self.run_number = config.run_number
 
         self.criterion = nn.CrossEntropyLoss(ignore_index=0)
 
@@ -160,9 +162,8 @@ class GrokkingTrainer:
         if quick_mode:
             patience = min(patience, 50)
 
-        print(f"Starting training with {self.softmax_variant} softmax...")
-
-        for epoch in tqdm(range(max_epochs), desc="Training"):
+        pbar = tqdm(range(max_epochs), desc=f"Run {self.run_number}")
+        for epoch in pbar:
             train_loss, train_acc = self.train_epoch()
             val_acc = self.evaluate()
 
@@ -170,15 +171,17 @@ class GrokkingTrainer:
             self.train_accuracies.append(train_acc)
             self.val_accuracies.append(val_acc)
 
+            # Update progress bar postfix with current metrics
+            pbar.set_postfix(
+                {"loss": f"{train_loss:.3f}", "val_acc": f"{val_acc:.3f}"}
+            )
+
             if (
                 val_acc >= grokking_threshold
                 and train_acc >= 0.99
                 and self.grokking_epoch is None
             ):
                 self.grokking_epoch = epoch
-                print(f"\nGrokking detected at epoch {epoch}!")
-                print(f"Training accuracy: {train_acc:.4f}")
-                print(f"Validation accuracy: {val_acc:.4f}")
                 break
 
             if val_acc > best_val_acc:
@@ -188,14 +191,7 @@ class GrokkingTrainer:
                 patience_counter += 1
 
             if patience_counter >= patience:
-                print(f"\nEarly stopping at epoch {epoch}")
                 break
-
-            if epoch % 10 == 0:
-                print(
-                    f"Epoch {epoch}: Train Loss: {train_loss:.4f}, "
-                    f"Train Acc: {train_acc:.4f}, Val Acc: {val_acc:.4f}"
-                )
 
         return {
             "grokking_epoch": self.grokking_epoch,
@@ -222,6 +218,7 @@ class ExperimentConfig:
     device: str = "cpu"
     seed: int = 42
     quick_mode: bool = False
+    run_number: int = 1
 
 
 def run_experiment(config: ExperimentConfig) -> dict:
@@ -320,6 +317,7 @@ def run_experiment(config: ExperimentConfig) -> dict:
             val_data=val_data,
             device=config.device,
             softmax_variant=config.softmax_variant,
+            run_number=config.run_number,
         )
     )
 
@@ -366,7 +364,7 @@ def run_comprehensive_experiments(
             "max_seq_len": 10,
             "batch_size": 32,
             "dropout": 0.2,
-            "max_epochs": 1000,
+            "max_epochs": 10,
             "grokking_threshold": 0.95,
         }
     else:
@@ -408,54 +406,129 @@ def run_comprehensive_experiments(
 
     all_results = []
 
-    print("Starting comprehensive experiments...")
-    print(f"Mode: {'Single task' if single_task else 'Full'}")
-    print(f"Tasks: {task_types}")
-    print(f"Softmax variants: {softmax_variants}")
-    print(f"Optimizers: {optimizer_types}")
-    print(f"Number of runs per config: {num_runs}")
-    print(f"Max epochs: {model_config['max_epochs']}")
-    print(
-        f"Total experiments: {len(task_types) * len(softmax_variants) * len(optimizer_types) * num_runs}"
+    total_experiments = (
+        len(task_types)
+        * len(softmax_variants)
+        * len(optimizer_types)
+        * num_runs
     )
+    print(f"🚀 Running {total_experiments} experiments ({num_runs} runs each)")
 
     for task_type in task_types:
         for softmax_variant in softmax_variants:
-            for optimizer_type in optimizer_types:
-                for run in range(num_runs):
-                    print(
-                        f"\nRunning: {task_type} + {softmax_variant} + {optimizer_type} (run {run + 1})"
+            print(f"\n=== {task_type.upper()} + {softmax_variant.upper()} ===")
+
+            # Run all Muon experiments first
+            print("\n--- Muon Optimizer ---")
+            muon_results = []
+            for run in range(num_runs):
+                results = run_experiment(
+                    ExperimentConfig(
+                        task_type=task_type,
+                        optimizer_type="muon",
+                        softmax_variant=softmax_variant,
+                        model_config=model_config,
+                        optimizer_config=muon_config,
+                        device=device,
+                        seed=42 + run,
+                        quick_mode=single_task,
+                        run_number=run + 1,
                     )
+                )
 
-                    optimizer_config = (
-                        muon_config
-                        if optimizer_type == "muon"
-                        else adamw_config
+                muon_results.append(results)
+                all_results.append(results)
+
+            # Muon summary
+            muon_grokking = [
+                r["grokking_epoch"]
+                for r in muon_results
+                if r["grokking_epoch"] is not None
+            ]
+            muon_success_rate = len(muon_grokking) / len(muon_results) * 100
+            if muon_grokking:
+                muon_avg = sum(muon_grokking) / len(muon_grokking)
+                grokking_epochs = [str(epoch) for epoch in muon_grokking]
+                print(
+                    f"📈 Muon: {muon_success_rate:.0f}% success, epochs: [{', '.join(grokking_epochs)}] (avg: {muon_avg:.1f})"
+                )
+            else:
+                print(
+                    f"📈 Muon: {muon_success_rate:.0f}% success, no grokking achieved"
+                )
+
+            # Run all AdamW experiments
+            print("\n--- AdamW Optimizer ---")
+            adamw_results = []
+            for run in range(num_runs):
+                results = run_experiment(
+                    ExperimentConfig(
+                        task_type=task_type,
+                        optimizer_type="adamw",
+                        softmax_variant=softmax_variant,
+                        model_config=model_config,
+                        optimizer_config=adamw_config,
+                        device=device,
+                        seed=42 + run,
+                        quick_mode=single_task,
+                        run_number=run + 1,
                     )
+                )
 
-                    results = run_experiment(
-                        ExperimentConfig(
-                            task_type=task_type,
-                            optimizer_type=optimizer_type,
-                            softmax_variant=softmax_variant,
-                            model_config=model_config,
-                            optimizer_config=optimizer_config,
-                            device=device,
-                            seed=42 + run,
-                            quick_mode=single_task,
-                        )
-                    )
+                adamw_results.append(results)
+                all_results.append(results)
 
-                    all_results.append(results)
+            # AdamW summary
+            adamw_grokking = [
+                r["grokking_epoch"]
+                for r in adamw_results
+                if r["grokking_epoch"] is not None
+            ]
+            adamw_success_rate = len(adamw_grokking) / len(adamw_results) * 100
+            if adamw_grokking:
+                adamw_avg = sum(adamw_grokking) / len(adamw_grokking)
+                grokking_epochs = [str(epoch) for epoch in adamw_grokking]
+                print(
+                    f"📈 AdamW: {adamw_success_rate:.0f}% success, epochs: [{', '.join(grokking_epochs)}] (avg: {adamw_avg:.1f})"
+                )
+            else:
+                print(
+                    f"📈 AdamW: {adamw_success_rate:.0f}% success, no grokking achieved"
+                )
 
-                    if results["grokking_epoch"] is not None:
-                        print(
-                            f"  Grokking at epoch: {results['grokking_epoch']}"
-                        )
-                    else:
-                        print(
-                            f"  No grokking detected (final val acc: {results['final_val_acc']:.4f})"
-                        )
+            # Show comparison for this task/variant
+            muon_grokking = [
+                r["grokking_epoch"]
+                for r in muon_results
+                if r["grokking_epoch"] is not None
+            ]
+            adamw_grokking = [
+                r["grokking_epoch"]
+                for r in adamw_results
+                if r["grokking_epoch"] is not None
+            ]
+
+            if muon_grokking and adamw_grokking:
+                muon_avg = sum(muon_grokking) / len(muon_grokking)
+                adamw_avg = sum(adamw_grokking) / len(adamw_grokking)
+                speedup = adamw_avg / muon_avg
+                print(
+                    f"\n📊 Comparison: Muon {muon_avg:.1f} epochs vs AdamW {adamw_avg:.1f} epochs (speedup: {speedup:.1f}x)"
+                )
+            elif muon_grokking:
+                muon_avg = sum(muon_grokking) / len(muon_grokking)
+                print(
+                    f"\n📊 Muon grokked in {muon_avg:.1f} epochs, AdamW failed to grok"
+                )
+            elif adamw_grokking:
+                adamw_avg = sum(adamw_grokking) / len(adamw_grokking)
+                print(
+                    f"\n📊 AdamW grokked in {adamw_avg:.1f} epochs, Muon failed to grok"
+                )
+            else:
+                print(
+                    "\n📊 Neither optimizer achieved grokking for this configuration"
+                )
 
     return all_results
 
@@ -493,9 +566,7 @@ def save_results(results: list[dict], output_dir: str = "results"):
     )
     df.to_csv(summary_file, index=False)
 
-    print(f"Results saved to {output_dir}")
-    print(f"Raw results: {results_file}")
-    print(f"Summary: {summary_file}")
+    print(f"💾 Results saved to {output_dir}/")
 
     return df
 
@@ -530,10 +601,8 @@ def main():
     args = parser.parse_args()
 
     if args.quick_test:
-        print("Running quick test...")
         results = run_comprehensive_experiments(device=args.device, num_runs=1)
     elif args.single_task:
-        print("Running single task test...")
         results = run_comprehensive_experiments(
             device=args.device, num_runs=args.num_runs, single_task=True
         )
@@ -544,9 +613,8 @@ def main():
 
     df = save_results(results, args.output_dir)
 
-    print("\n" + "=" * 50)
-    print("EXPERIMENT SUMMARY")
-    print("=" * 50)
+    print("\n📊 FINAL RESULTS")
+    print("=" * 30)
 
     muon_results = df[df["optimizer_type"] == "muon"]
     adamw_results = df[df["optimizer_type"] == "adamw"]
@@ -556,19 +624,17 @@ def main():
         adamw_grokking = adamw_results["grokking_epoch"].dropna()
 
         if len(muon_grokking) > 0 and len(adamw_grokking) > 0:
-            print(f"Muon average grokking epoch: {muon_grokking.mean():.2f}")
-            print(f"AdamW average grokking epoch: {adamw_grokking.mean():.2f}")
+            muon_avg = muon_grokking.mean()
+            adamw_avg = adamw_grokking.mean()
+            speedup = adamw_avg / muon_avg if muon_avg > 0 else float("inf")
 
-            if muon_grokking.mean() == 0:
-                print("Speedup: ∞x (Muon achieves immediate grokking)")
-            else:
-                print(
-                    f"Speedup: {adamw_grokking.mean() / muon_grokking.mean():.2f}x"
-                )
+            print(f"⚡ Muon: {muon_avg:.1f} epochs")
+            print(f"🐌 AdamW: {adamw_avg:.1f} epochs")
+            print(f"🚀 Speedup: {speedup:.1f}x")
         else:
-            print("No grokking detected in some configurations")
+            print("⚠️  No grokking detected in some configurations")
 
-    print(f"Total experiments completed: {len(results)}")
+    print(f"✅ {len(results)} experiments completed")
 
 
 if __name__ == "__main__":
