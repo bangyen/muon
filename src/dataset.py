@@ -34,11 +34,9 @@ class ModularArithmeticDataset(Dataset[dict[str, Union[torch.Tensor, int]]]):
             task_type: Task type or DatasetConfig object
             **kwargs: Additional configuration parameters
         """
-        # Handle both config object and individual parameters
         if isinstance(task_type, DatasetConfig):
             config = task_type
         else:
-            # Extract parameters from kwargs
             config = DatasetConfig(
                 task_type=task_type,
                 modulus=kwargs.get("modulus", 97),
@@ -73,20 +71,15 @@ class ModularArithmeticDataset(Dataset[dict[str, Union[torch.Tensor, int]]]):
         self.max_seq_len = config.max_seq_len
         self.seed = config.seed
 
-        # Set random seed
         random.seed(config.seed)
         np.random.seed(config.seed)
 
-        # Generate data based on task type
         if config.task_type == "parity":
             self.data = self._generate_parity_data()
         else:
             self.data = self._generate_modular_data()
 
-        # Split into train/val
         self._split_data()
-
-        # Create vocabulary
         self._create_vocabulary()
 
     def _generate_modular_data(self) -> list[tuple[int, int, int]]:
@@ -107,14 +100,13 @@ class ModularArithmeticDataset(Dataset[dict[str, Union[torch.Tensor, int]]]):
 
         elif self.task_type == "div":
             for a in range(self.modulus):
-                for b in range(1, self.modulus):  # Avoid division by zero
-                    # Find multiplicative inverse
+                for b in range(1, self.modulus):
                     try:
                         inv_b = pow(b, -1, self.modulus)
                         result = (a * inv_b) % self.modulus
                         data.append((a, b, result))
                     except ValueError:
-                        continue  # Skip if no inverse exists
+                        continue
 
         elif self.task_type == "exp":
             for a in range(self.modulus):
@@ -133,12 +125,10 @@ class ModularArithmeticDataset(Dataset[dict[str, Union[torch.Tensor, int]]]):
     def _generate_parity_data(self) -> list[tuple[int, int, int]]:
         """Generate data for parity task (10-bit binary strings)"""
         data = []
-        for i in range(1024):  # 2^10 = 1024 possible 10-bit strings
+        for i in range(1024):
             binary_str = format(i, "010b")
             parity = sum(int(bit) for bit in binary_str) % 2
-            data.append(
-                (i, 0, parity)
-            )  # Second operand is dummy for consistency
+            data.append((i, 0, parity))
         return data
 
     def _gcd(self, a: int, b: int) -> int:
@@ -149,7 +139,6 @@ class ModularArithmeticDataset(Dataset[dict[str, Union[torch.Tensor, int]]]):
 
     def _split_data(self) -> None:
         """Split data into train and validation sets"""
-        # Shuffle data
         random.shuffle(self.data)
 
         split_idx = int(len(self.data) * self.train_split)
@@ -158,7 +147,6 @@ class ModularArithmeticDataset(Dataset[dict[str, Union[torch.Tensor, int]]]):
 
     def _create_vocabulary(self) -> None:
         """Create vocabulary mapping for tokenization"""
-        # Special tokens
         self.special_tokens = {
             "<pad>": 0,
             "<unk>": 1,
@@ -175,34 +163,24 @@ class ModularArithmeticDataset(Dataset[dict[str, Union[torch.Tensor, int]]]):
             "parity": 12,
         }
 
-        # Number tokens (0 to modulus-1)
         self.number_tokens = {
             str(i): i + len(self.special_tokens) for i in range(self.modulus)
         }
 
-        # Combine vocabularies
         self.vocab = {**self.special_tokens, **self.number_tokens}
         self.vocab_size = len(self.vocab)
-
-        # Reverse mapping
         self.idx_to_token = {v: k for k, v in self.vocab.items()}
-
-        # Add token_to_id mapping for compatibility with tests
         self.token_to_id = self.vocab
 
     def _tokenize(self, a: int, b: int, result: int) -> list[int]:
         """Convert arithmetic expression to token sequence"""
         if self.task_type == "parity":
-            # For parity: [<bos>, number, <eos>] -> parity
-            # For parity, we need to handle large numbers (up to 1023 for 10-bit)
-            # Use the actual number as token index
             token_index = a + len(self.special_tokens)
             return [
                 self.vocab["<bos>"],
                 token_index,
                 self.vocab["<eos>"],
             ]
-        # For modular arithmetic: [<bos>, a, op, b, =, result, <eos>]
         op_token = {
             "add": self.vocab["+"],
             "sub": self.vocab["-"],
@@ -238,13 +216,9 @@ class ModularArithmeticDataset(Dataset[dict[str, Union[torch.Tensor, int]]]):
         """
         a, b, result = self.train_data[idx]
 
-        # Tokenize input sequence
         input_tokens = self._tokenize(a, b, result)
-
-        # Create target (shifted by 1 for next token prediction)
         target_tokens = input_tokens[1:] + [self.vocab["<pad>"]]
 
-        # Pad sequences
         if len(input_tokens) < self.max_seq_len:
             input_tokens += [self.vocab["<pad>"]] * (
                 self.max_seq_len - len(input_tokens)
@@ -269,7 +243,6 @@ class ModularArithmeticDataset(Dataset[dict[str, Union[torch.Tensor, int]]]):
             input_tokens = self._tokenize(a, b, result)
             target_tokens = input_tokens[1:] + [self.vocab["<pad>"]]
 
-            # Pad sequences
             if len(input_tokens) < self.max_seq_len:
                 input_tokens += [self.vocab["<pad>"]] * (
                     self.max_seq_len - len(input_tokens)
@@ -307,25 +280,25 @@ def get_task_configs() -> dict[str, dict[str, Union[int, float]]]:
         "gcd": {
             "modulus": 97,
             "train_split": 0.5,
-        },  # Greatest common divisor, mod 97, 50% train split
+        },
         "add": {
             "modulus": 97,
             "train_split": 0.8,
-        },  # Addition, mod 97, 80% train split (Mod-add in paper)
+        },
         "div": {
             "modulus": 97,
             "train_split": 0.8,
-        },  # Division, mod 97, 80% train split (Mod-div in paper)
+        },
         "exp": {
             "modulus": 97,
             "train_split": 0.7,
-        },  # Exponentiation, mod 97, 70% train split (Mod-exp in paper)
+        },
         "mul": {
             "modulus": 97,
             "train_split": 0.5,
-        },  # Multiplication, mod 97, 50% train split (Mod-mul in paper)
+        },
         "parity": {
-            "modulus": 1024,  # Parity of a 10-bit number, 1024 rows
-            "train_split": 0.5,  # 50% train split
+            "modulus": 1024,
+            "train_split": 0.5,
         },
     }

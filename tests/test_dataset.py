@@ -24,23 +24,19 @@ class TestModularArithmeticDataset:
         """Test dataset initialization with various configurations"""
         config = TestConfig.TEST_DATASET_CONFIG
 
-        # Test each task type
         task_types = ["add", "mul", "div", "exp", "gcd", "parity"]
 
         for task_type in task_types:
             dataset = ModularArithmeticDataset(task_type, **config)
 
-            # Check basic attributes
             assert dataset.task_type == task_type
             assert dataset.modulus == config["modulus"]
             assert dataset.train_split == config["train_split"]
             assert dataset.max_seq_len == config["max_seq_len"]
             assert dataset.seed == config["seed"]
 
-            # Check that data exists
             assert len(dataset.data) > 0
 
-            # Check that train/val split exists
             assert len(dataset.train_data) > 0
             assert len(dataset.val_data) > 0
 
@@ -50,17 +46,16 @@ class TestModularArithmeticDataset:
 
         modulus = 97
         test_cases = [
-            ("add", 9409),  # 97 * 97 = 9409
+            ("add", 9409),
             ("mul", 9409),
-            ("div", 9312),  # Some numbers don't have multiplicative inverses
+            ("div", 9312),
             ("exp", 9409),
             ("gcd", 9409),
-            ("parity", 1024),  # 2^10 = 1024 (uses modulus 2, not 97)
+            ("parity", 1024),
         ]
 
         for task_type, expected_size in test_cases:
             if task_type == "parity":
-                # Parity task uses modulus 2, not 97
                 dataset = ModularArithmeticDataset(
                     task_type, modulus=2, train_split=0.5
                 )
@@ -69,29 +64,23 @@ class TestModularArithmeticDataset:
                     task_type, modulus=modulus, train_split=0.5
                 )
 
-            # Check data size
             assert len(dataset.data) == expected_size
 
-            # Check data format
-            for item in dataset.data[:10]:  # Check first 10 items
-                assert len(item) == 3  # (a, b, result)
+            for item in dataset.data[:10]:
+                assert len(item) == 3
                 assert all(isinstance(x, int) for x in item)
                 if task_type == "parity":
-                    # For parity, first input can be up to 1023 (10-bit number)
-                    assert 0 <= item[0] < 1024  # 10-bit number
-                    assert 0 <= item[1] < 2  # second input (modulus 2)
-                    assert 0 <= item[2] < 2  # output (modulus 2)
+                    assert 0 <= item[0] < 1024
+                    assert 0 <= item[1] < 2
+                    assert 0 <= item[2] < 2
                 else:
-                    assert all(0 <= x < modulus for x in item[:2])  # inputs
-                assert (
-                    0 <= item[2] < (2 if task_type == "parity" else modulus)
-                )  # output
+                    assert all(0 <= x < modulus for x in item[:2])
+                assert 0 <= item[2] < (2 if task_type == "parity" else modulus)
 
     def test_train_val_split(self):
         """Test train/validation split functionality"""
         set_seed(42)
 
-        # Test different split ratios
         split_ratios = [0.1, 0.5, 0.8, 0.9]
 
         for split_ratio in split_ratios:
@@ -101,10 +90,8 @@ class TestModularArithmeticDataset:
             train_size = len(dataset.train_data)
             val_size = len(dataset.val_data)
 
-            # Check that split adds up correctly
             assert train_size + val_size == total_size
 
-            # Check that split ratio is approximately correct
             expected_train_size = int(total_size * split_ratio)
             assert abs(train_size - expected_train_size) <= 1
 
@@ -114,15 +101,12 @@ class TestModularArithmeticDataset:
 
         dataset = ModularArithmeticDataset("add", modulus=97)
 
-        # Check vocabulary size
         assert dataset.vocab_size > 0
 
-        # Check that vocabulary contains necessary tokens
-        assert "<pad>" in dataset.token_to_id  # padding token
-        assert "=" in dataset.token_to_id  # equals token
-        assert "mod" in dataset.token_to_id  # modulo token
+        assert "<pad>" in dataset.token_to_id
+        assert "=" in dataset.token_to_id
+        assert "mod" in dataset.token_to_id
 
-        # Check that numbers are in vocabulary
         for i in range(min(10, dataset.modulus)):
             assert str(i) in dataset.token_to_id
 
@@ -132,24 +116,19 @@ class TestModularArithmeticDataset:
 
         dataset = ModularArithmeticDataset("add", modulus=97)
 
-        # Test getting a sample
         sample = dataset[0]
 
-        # Check sample format
         assert "input" in sample
         assert "target" in sample
         assert "result" in sample
 
-        # Check data types
         assert isinstance(sample["input"], torch.Tensor)
         assert isinstance(sample["target"], torch.Tensor)
         assert isinstance(sample["result"], int)
 
-        # Check tensor shapes
-        assert sample["input"].dim() == 1  # 1D sequence
-        assert sample["target"].dim() == 1  # 1D sequence
+        assert sample["input"].dim() == 1
+        assert sample["target"].dim() == 1
 
-        # Check that input and target have same length
         assert sample["input"].shape == sample["target"].shape
 
     def test_data_loader(self):
@@ -158,24 +137,19 @@ class TestModularArithmeticDataset:
 
         dataset = ModularArithmeticDataset("add", modulus=97)
 
-        # Create DataLoader
         batch_size = 4
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-        # Get a batch
         batch = next(iter(dataloader))
 
-        # Check batch format
         assert "input" in batch
         assert "target" in batch
         assert "result" in batch
 
-        # Check batch shapes
         assert batch["input"].shape[0] == batch_size
         assert batch["target"].shape[0] == batch_size
         assert len(batch["result"]) == batch_size
 
-        # Check that all samples in batch have same sequence length
         assert batch["input"].shape[1] == batch["target"].shape[1]
 
     def test_modular_arithmetic_correctness(self):
@@ -192,7 +166,6 @@ class TestModularArithmeticDataset:
         for task_type, expected_func in test_cases:
             dataset = ModularArithmeticDataset(task_type, modulus=modulus)
 
-            # Test first 100 samples
             for _i, (a, b, result) in enumerate(dataset.data[:100]):
                 expected = expected_func(a, b)
                 assert (
@@ -205,12 +178,9 @@ class TestModularArithmeticDataset:
 
         dataset = ModularArithmeticDataset("parity", modulus=2)
 
-        # Check data size
-        assert len(dataset.data) == 1024  # 2^10
+        assert len(dataset.data) == 1024
 
-        # Test that parity is calculated correctly
         for _i, (num, _, parity) in enumerate(dataset.data[:100]):
-            # Convert number to binary string and count 1s
             binary_str = format(num, "010b")
             expected_parity = sum(int(bit) for bit in binary_str) % 2
             assert (
@@ -223,7 +193,6 @@ class TestModularArithmeticDataset:
 
         dataset = ModularArithmeticDataset("gcd", modulus=97)
 
-        # Test that GCD is calculated correctly
         for _i, (a, b, result) in enumerate(dataset.data[:100]):
             expected_gcd = dataset._gcd(a, b)
             assert (
@@ -236,10 +205,8 @@ class TestModularArithmeticDataset:
 
         dataset = ModularArithmeticDataset("div", modulus=97)
 
-        # Test that division is calculated correctly
         for _i, (a, b, result) in enumerate(dataset.data[:100]):
             if b != 0:
-                # Check that result * b ≡ a (mod modulus)
                 check_result = (result * b) % dataset.modulus
                 assert (
                     check_result == a
@@ -249,13 +216,11 @@ class TestModularArithmeticDataset:
         """Test handling of different sequence lengths"""
         set_seed(42)
 
-        # Test with different max_seq_len values
         for max_seq_len in [3, 5, 7]:
             dataset = ModularArithmeticDataset(
                 "add", modulus=97, max_seq_len=max_seq_len
             )
 
-            # Check that sequences don't exceed max length
             sample = dataset[0]
             assert sample["input"].shape[0] <= max_seq_len
             assert sample["target"].shape[0] <= max_seq_len
@@ -264,19 +229,15 @@ class TestModularArithmeticDataset:
         """Test that dataset generation is reproducible with same seed"""
         set_seed(42)
 
-        # Create two datasets with same seed
         dataset1 = ModularArithmeticDataset("add", seed=123)
         dataset2 = ModularArithmeticDataset("add", seed=123)
 
-        # Check that data is identical
         assert len(dataset1.data) == len(dataset2.data)
         assert dataset1.data == dataset2.data
 
-        # Check that train/val splits are identical
         assert dataset1.train_data == dataset2.train_data
         assert dataset1.val_data == dataset2.val_data
 
-        # Check that vocabulary is identical
         assert dataset1.token_to_id == dataset2.token_to_id
         assert dataset1.idx_to_token == dataset2.idx_to_token
 
@@ -284,26 +245,21 @@ class TestModularArithmeticDataset:
         """Test that different seeds produce different data"""
         set_seed(42)
 
-        # Create datasets with different seeds
         dataset1 = ModularArithmeticDataset("add", seed=123)
         dataset2 = ModularArithmeticDataset("add", seed=456)
 
-        # Check that data is different
         assert dataset1.data != dataset2.data
 
     def test_edge_cases(self):
         """Test edge cases and error handling"""
         set_seed(42)
 
-        # Test invalid task type
         with pytest.raises(ValueError, match="Invalid task type"):
             ModularArithmeticDataset("invalid_task")
 
-        # Test invalid modulus
         with pytest.raises(ValueError, match="Modulus must be positive"):
             ModularArithmeticDataset("add", modulus=0)
 
-        # Test invalid train split
         with pytest.raises(
             ValueError, match="Train split must be between 0 and 1"
         ):
@@ -318,15 +274,10 @@ class TestModularArithmeticDataset:
         """Test that dataset doesn't use excessive memory"""
         set_seed(42)
 
-        # Create a large dataset
         dataset = ModularArithmeticDataset("add", modulus=97)
 
-        # Check that dataset size is reasonable
-        # This is a rough estimate - actual memory usage depends on implementation
-        estimated_size = (
-            len(dataset.data) * 3 * 8
-        )  # 3 ints per sample, 8 bytes per int
-        assert estimated_size < 1e6  # Less than 1MB for basic data
+        estimated_size = len(dataset.data) * 3 * 8
+        assert estimated_size < 1e6
 
 
 class TestDatasetIntegration:
@@ -338,7 +289,6 @@ class TestDatasetIntegration:
 
         from src.model import GrokkingTransformer
 
-        # Create dataset and model
         dataset = ModularArithmeticDataset("add", modulus=97)
         model = GrokkingTransformer(
             vocab_size=dataset.vocab_size,
@@ -349,14 +299,12 @@ class TestDatasetIntegration:
             max_seq_len=10,
         )
 
-        # Test forward pass with dataset sample
         sample = dataset[0]
-        inputs = sample["input"].unsqueeze(0)  # Add batch dimension
+        inputs = sample["input"].unsqueeze(0)
 
         with torch.no_grad():
             output = model(inputs)
 
-        # Check output shape
         expected_shape = (1, inputs.shape[1], dataset.vocab_size)
         assert output.shape == expected_shape
 
@@ -368,7 +316,6 @@ class TestDatasetIntegration:
 
         from src.model import GrokkingTransformer
 
-        # Create dataset, model, and optimizer
         dataset = ModularArithmeticDataset("add", modulus=97)
         model = GrokkingTransformer(
             vocab_size=dataset.vocab_size,
@@ -379,7 +326,6 @@ class TestDatasetIntegration:
             max_seq_len=10,
         )
 
-        # Separate parameters for Muon
         hidden_weights = [p for p in model.parameters() if p.ndim >= 2]
         other_params = [p for p in model.parameters() if p.ndim < 2]
 
@@ -400,25 +346,20 @@ class TestDatasetIntegration:
         ]
         optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
 
-        # Test training step
         sample = dataset[0]
         inputs = sample["input"].unsqueeze(0)
         targets = sample["target"].unsqueeze(0)
 
-        # Forward pass
         logits = model(inputs)
         logits = logits.view(-1, logits.size(-1))
         targets = targets.view(-1)
 
-        # Compute loss
         criterion = torch.nn.CrossEntropyLoss(ignore_index=0)
         loss = criterion(logits, targets)
 
-        # Backward pass
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-        # Check that training step completed successfully
         assert loss.item() > 0
         assert torch.isfinite(loss)

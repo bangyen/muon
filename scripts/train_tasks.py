@@ -52,23 +52,18 @@ class GrokkingTrainer:
         self.device = config.device
         self.softmax_variant = config.softmax_variant
 
-        # Loss function
-        self.criterion = nn.CrossEntropyLoss(
-            ignore_index=0
-        )  # Ignore padding token
+        self.criterion = nn.CrossEntropyLoss(ignore_index=0)
 
-        # Training history
         self.train_losses = []
         self.train_accuracies = []
         self.val_accuracies = []
         self.grokking_epoch = None
 
-        # Softmax function
         if config.softmax_variant == "stablemax":
             self.softmax_fn = SoftmaxVariants.stablemax
         elif config.softmax_variant == "sparsemax":
             self.softmax_fn = SoftmaxVariants.sparsemax
-        else:  # standard
+        else:
             self.softmax_fn = SoftmaxVariants.standard_softmax
 
     def train_epoch(self) -> tuple[float, float]:
@@ -82,25 +77,20 @@ class GrokkingTrainer:
             inputs = batch["input"].to(self.device)
             targets = batch["target"].to(self.device)
 
-            # Forward pass
             logits = self.model(inputs)
 
-            # Reshape for loss calculation
             logits = logits.view(-1, logits.size(-1))
             targets = targets.view(-1)
 
-            # Compute loss
             loss = self.criterion(logits, targets)
 
-            # Backward pass
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
 
-            # Compute accuracy
             with torch.no_grad():
                 predictions = torch.argmax(logits, dim=-1)
-                mask = targets != 0  # Ignore padding
+                mask = targets != 0
                 correct_predictions += (
                     (predictions[mask] == targets[mask]).sum().item()
                 )
@@ -127,16 +117,13 @@ class GrokkingTrainer:
                 inputs = sample["input"].unsqueeze(0).to(self.device)
                 targets = sample["target"].to(self.device)
 
-                # Forward pass
                 logits = self.model(inputs)
 
-                # Reshape for evaluation
                 logits = logits.view(-1, logits.size(-1))
                 targets = targets.view(-1)
 
-                # Compute accuracy
                 predictions = torch.argmax(logits, dim=-1)
-                mask = targets != 0  # Ignore padding
+                mask = targets != 0
                 correct_predictions += (
                     (predictions[mask] == targets[mask]).sum().item()
                 )
@@ -170,40 +157,30 @@ class GrokkingTrainer:
         best_val_acc = 0.0
         patience_counter = 0
 
-        # Adjust patience for quick mode
         if quick_mode:
-            patience = min(
-                patience, 50
-            )  # Less aggressive early stopping for delayed grokking
+            patience = min(patience, 50)
 
         print(f"Starting training with {self.softmax_variant} softmax...")
 
         for epoch in tqdm(range(max_epochs), desc="Training"):
-            # Train one epoch
             train_loss, train_acc = self.train_epoch()
             val_acc = self.evaluate()
 
-            # Store history
             self.train_losses.append(train_loss)
             self.train_accuracies.append(train_acc)
             self.val_accuracies.append(val_acc)
 
-            # Check for grokking as defined in the paper:
-            # "the first epoch where validation accuracy reaches or exceeds 95%,
-            # occurring after the training accuracy has already stabilized near 100%"
             if (
                 val_acc >= grokking_threshold
-                and train_acc >= 0.99  # Training accuracy stabilized near 100%
+                and train_acc >= 0.99
                 and self.grokking_epoch is None
             ):
                 self.grokking_epoch = epoch
                 print(f"\nGrokking detected at epoch {epoch}!")
                 print(f"Training accuracy: {train_acc:.4f}")
                 print(f"Validation accuracy: {val_acc:.4f}")
-                # Stop training immediately when grokking is detected
                 break
 
-            # Early stopping (only if grokking hasn't been detected)
             if val_acc > best_val_acc:
                 best_val_acc = val_acc
                 patience_counter = 0
@@ -214,14 +191,12 @@ class GrokkingTrainer:
                 print(f"\nEarly stopping at epoch {epoch}")
                 break
 
-            # Print progress
             if epoch % 10 == 0:
                 print(
                     f"Epoch {epoch}: Train Loss: {train_loss:.4f}, "
                     f"Train Acc: {train_acc:.4f}, Val Acc: {val_acc:.4f}"
                 )
 
-        # Compile results
         return {
             "grokking_epoch": self.grokking_epoch,
             "final_train_loss": self.train_losses[-1],
@@ -259,15 +234,12 @@ def run_experiment(config: ExperimentConfig) -> dict:
     Returns:
         Experiment results
     """
-    # Set random seeds
     torch.manual_seed(config.seed)
     np.random.seed(config.seed)
 
-    # Get task configuration
     task_configs = get_task_configs()
     task_config = task_configs[config.task_type]
 
-    # Create dataset
     dataset = ModularArithmeticDataset(
         DatasetConfig(
             task_type=config.task_type,
@@ -278,13 +250,11 @@ def run_experiment(config: ExperimentConfig) -> dict:
         )
     )
 
-    # Create data loader
     train_loader = DataLoader(
         dataset, batch_size=config.model_config["batch_size"], shuffle=True
     )
     val_data = dataset.get_val_data()
 
-    # Create model
     model = GrokkingTransformer(
         ModelConfig(
             vocab_size=dataset.vocab_size,
@@ -297,15 +267,11 @@ def run_experiment(config: ExperimentConfig) -> dict:
         )
     )
 
-    # Create optimizer
     if config.optimizer_type == "muon":
-        # Use Muon more selectively - only for weight matrices that map dense to dense
-        # Avoid applying Muon to embeddings, biases, layer norm scales, etc.
         muon_params = []
         adamw_params = []
 
         for name, param in model.named_parameters():
-            # Apply Muon only to weight matrices in attention and feed-forward layers
             if (
                 param.ndim >= 2
                 and (
@@ -326,20 +292,18 @@ def run_experiment(config: ExperimentConfig) -> dict:
                 params=muon_params,
                 use_muon=True,
                 lr=config.optimizer_config["lr"],
-                momentum=0.95,  # Default Muon momentum
+                momentum=0.95,
                 weight_decay=config.optimizer_config["weight_decay"],
             ),
             dict(
                 params=adamw_params,
                 use_muon=False,
-                lr=config.optimizer_config["lr"]
-                * 0.1,  # Lower LR for non-Muon params
+                lr=config.optimizer_config["lr"] * 0.1,
                 betas=config.optimizer_config["betas"],
                 weight_decay=config.optimizer_config["weight_decay"],
             ),
         ]
         optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
-    else:  # AdamW
         optimizer = optim.AdamW(
             model.parameters(),
             lr=config.optimizer_config["lr"],
@@ -347,7 +311,6 @@ def run_experiment(config: ExperimentConfig) -> dict:
             weight_decay=config.optimizer_config["weight_decay"],
         )
 
-    # Create trainer
     trainer = GrokkingTrainer(
         TrainerConfig(
             model=model,
@@ -359,14 +322,12 @@ def run_experiment(config: ExperimentConfig) -> dict:
         )
     )
 
-    # Train
     results = trainer.train(
         max_epochs=config.model_config["max_epochs"],
         grokking_threshold=config.model_config["grokking_threshold"],
         quick_mode=config.quick_mode,
     )
 
-    # Add metadata
     results.update(
         {
             "task_type": config.task_type,
@@ -395,65 +356,51 @@ def run_comprehensive_experiments(
     Returns:
         List of experiment results
     """
-    # Model configuration based on paper requirements
-    # Paper uses "modern Transformer architecture" - using sizes that delay grokking appropriately
     if single_task:
-        # Model sized to delay grokking for meaningful comparison
         model_config = {
-            "hidden_size": 32,  # Smaller to delay grokking
-            "num_layers": 2,  # Fewer layers for speed
-            "num_heads": 4,  # Fewer heads for speed
-            "ff_size": 128,  # Smaller feedforward
-            "max_seq_len": 10,  # Sufficient for arithmetic expressions
-            "batch_size": 32,  # Standard batch size
-            "dropout": 0.2,  # Higher dropout to delay grokking
-            "max_epochs": 1000,  # Sufficient for grokking
-            "grokking_threshold": 0.95,  # Paper threshold
+            "hidden_size": 32,
+            "num_layers": 2,
+            "num_heads": 4,
+            "ff_size": 128,
+            "max_seq_len": 10,
+            "batch_size": 32,
+            "dropout": 0.2,
+            "max_epochs": 1000,
+            "grokking_threshold": 0.95,
         }
     else:
-        # Model sized to match paper specifications for delayed grokking
-        # Paper uses "modern Transformer architecture" - using sizes that delay grokking appropriately
-        # The paper mentions using models that achieve ~150 epoch grokking delay with AdamW
-        # We need larger models and different hyperparameters to achieve this delay
         model_config = {
-            "hidden_size": 256,  # Larger hidden size to delay grokking
-            "num_layers": 6,  # More layers to delay grokking
-            "num_heads": 8,  # Standard attention heads
-            "ff_size": 1024,  # Larger feedforward size
-            "max_seq_len": 10,  # Sufficient for arithmetic expressions
-            "batch_size": 32,  # Smaller batch size to delay grokking
-            "dropout": 0.2,  # Higher dropout to delay grokking
-            "max_epochs": 1000,  # Sufficient for grokking
-            "grokking_threshold": 0.95,  # Paper threshold: "validation accuracy reaches or exceeds 95%"
+            "hidden_size": 256,
+            "num_layers": 6,
+            "num_heads": 8,
+            "ff_size": 1024,
+            "max_seq_len": 10,
+            "batch_size": 32,
+            "dropout": 0.2,
+            "max_epochs": 1000,
+            "grokking_threshold": 0.95,
         }
 
-    # Optimizer configurations as described in the paper
-    # Paper states: "Both optimizers were configured with equivalent weight decay strengths"
-    # Paper mentions AdamW with β₁=0.9, β₂=0.98
-    # Lower learning rates to achieve delayed grokking as in the paper
     muon_config = {
-        "lr": 0.005,  # Lower learning rate for Muon to delay grokking
+        "lr": 0.005,
         "betas": (
             0.9,
             0.98,
-        ),  # Match paper AdamW betas for non-Muon parameters
-        "weight_decay": 1e-2,  # Equivalent weight decay strength
+        ),
+        "weight_decay": 1e-2,
     }
 
     adamw_config = {
-        "lr": 0.0005,  # Lower learning rate for AdamW to delay grokking
-        "betas": (0.9, 0.98),  # Paper AdamW betas: β₁=0.9, β₂=0.98
-        "weight_decay": 1e-2,  # Equivalent weight decay strength
+        "lr": 0.0005,
+        "betas": (0.9, 0.98),
+        "weight_decay": 1e-2,
     }
 
-    # Task types and softmax variants
     if single_task:
-        # Single task: only 1 task, 1 softmax, 1 optimizer = 1 experiment total
-        task_types = ["exp"]  # Exponentiation is harder
+        task_types = ["exp"]
         softmax_variants = ["standard"]
-        optimizer_types = ["muon", "adamw"]  # Compare both optimizers
+        optimizer_types = ["muon", "adamw"]
     else:
-        # Full: all configurations (matching paper Figure 2)
         task_types = ["gcd", "add", "div", "exp", "mul", "parity"]
         softmax_variants = ["standard", "stablemax", "sparsemax"]
         optimizer_types = ["muon", "adamw"]
@@ -479,14 +426,12 @@ def run_comprehensive_experiments(
                         f"\nRunning: {task_type} + {softmax_variant} + {optimizer_type} (run {run + 1})"
                     )
 
-                    # Select optimizer config
                     optimizer_config = (
                         muon_config
                         if optimizer_type == "muon"
                         else adamw_config
                     )
 
-                    # Run experiment
                     results = run_experiment(
                         ExperimentConfig(
                             task_type=task_type,
@@ -502,7 +447,6 @@ def run_comprehensive_experiments(
 
                     all_results.append(results)
 
-                    # Print results
                     if results["grokking_epoch"] is not None:
                         print(
                             f"  Grokking at epoch: {results['grokking_epoch']}"
@@ -519,7 +463,6 @@ def save_results(results: list[dict], output_dir: str = "results"):
     """Save experiment results"""
     os.makedirs(output_dir, exist_ok=True)
 
-    # Save raw results
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     results_file = os.path.join(
         output_dir, f"experiment_results_{timestamp}.json"
@@ -528,7 +471,6 @@ def save_results(results: list[dict], output_dir: str = "results"):
     with open(results_file, "w") as f:
         json.dump(results, f, indent=2, default=str)
 
-    # Create summary DataFrame
     summary_data = []
     for result in results:
         summary_data.append(
@@ -587,30 +529,24 @@ def main():
     args = parser.parse_args()
 
     if args.quick_test:
-        # Quick test with limited configurations
         print("Running quick test...")
         results = run_comprehensive_experiments(device=args.device, num_runs=1)
     elif args.single_task:
-        # Single task test
         print("Running single task test...")
         results = run_comprehensive_experiments(
             device=args.device, num_runs=args.num_runs, single_task=True
         )
     else:
-        # Full experiments
         results = run_comprehensive_experiments(
             device=args.device, num_runs=args.num_runs
         )
 
-    # Save results
     df = save_results(results, args.output_dir)
 
-    # Print summary statistics
     print("\n" + "=" * 50)
     print("EXPERIMENT SUMMARY")
     print("=" * 50)
 
-    # Compare Muon vs AdamW
     muon_results = df[df["optimizer_type"] == "muon"]
     adamw_results = df[df["optimizer_type"] == "adamw"]
 
@@ -622,7 +558,6 @@ def main():
             print(f"Muon average grokking epoch: {muon_grokking.mean():.2f}")
             print(f"AdamW average grokking epoch: {adamw_grokking.mean():.2f}")
 
-            # Handle division by zero when Muon achieves grokking at epoch 0
             if muon_grokking.mean() == 0:
                 print("Speedup: ∞x (Muon achieves immediate grokking)")
             else:

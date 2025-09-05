@@ -16,17 +16,14 @@ def create_grokking_comparison_plot(
     """
     os.makedirs(output_dir, exist_ok=True)
 
-    # Filter for experiments that achieved grokking
     grokking_df = df[df["grokking_epoch"].notna()].copy()
 
     if len(grokking_df) == 0:
         print("No grokking detected in any experiments")
         return None
 
-    # Create the main comparison plot matching Figure 4 from the paper
     plt.figure(figsize=(10, 6))
 
-    # Box plot comparison (main figure)
     sns.boxplot(data=grokking_df, x="optimizer_type", y="grokking_epoch")
     plt.title(
         "Distribution of Grokking Epochs for Muon and AdamW Optimizers",
@@ -35,7 +32,6 @@ def create_grokking_comparison_plot(
     plt.ylabel("Grokking Epoch", fontsize=12)
     plt.xlabel("Optimizer", fontsize=12)
 
-    # Add mean lines
     muon_mean = grokking_df[grokking_df["optimizer_type"] == "muon"][
         "grokking_epoch"
     ].mean()
@@ -73,7 +69,6 @@ def create_grokking_comparison_plot(
     )
     plt.close()
 
-    # Create violin plot for better distribution visualization
     plt.figure(figsize=(10, 6))
     sns.violinplot(data=grokking_df, x="optimizer_type", y="grokking_epoch")
     plt.title("Distribution of Grokking Epochs (Violin Plot)", fontsize=14)
@@ -89,7 +84,6 @@ def create_grokking_comparison_plot(
     )
     plt.close()
 
-    # Print summary statistics matching paper format
     print("\n" + "=" * 50)
     print("GROKKING COMPARISON SUMMARY")
     print("=" * 50)
@@ -106,7 +100,6 @@ def create_grokking_comparison_plot(
         print(f"AdamW average grokking epoch: {adamw_grokking.mean():.2f}")
         print(f"Speedup: {adamw_grokking.mean() / muon_grokking.mean():.2f}x")
 
-        # Statistical test matching paper methodology
         from scipy import stats
 
         t_stat, p_value = stats.ttest_ind(
@@ -114,7 +107,6 @@ def create_grokking_comparison_plot(
         )
         print(f"T-test: t={t_stat:.4f}, p={p_value:.2e}")
 
-        # Compare with paper results
         print("\nComparison with Paper Results:")
         print("Paper Muon mean:    102.89")
         print(f"Our Muon mean:      {muon_grokking.mean():.2f}")
@@ -136,19 +128,15 @@ def create_learning_curves_plot(
     """
     os.makedirs(output_dir, exist_ok=True)
 
-    # Select a few representative experiments for visualization
     sample_results = []
     for result in results:
-        if (
-            result["grokking_epoch"] is not None
-        ):  # Only show successful grokking
+        if result["grokking_epoch"] is not None:
             sample_results.append(result)
 
     if len(sample_results) == 0:
         print("No successful grokking experiments to plot")
         return
 
-    # Create subplots for different tasks
     fig, axes = plt.subplots(2, 3, figsize=(18, 12))
     axes = axes.flatten()
 
@@ -173,8 +161,7 @@ def create_learning_curves_plot(
             ax.set_title(f"Task: {task}")
             continue
 
-        # Plot learning curves
-        for result in task_results[:3]:  # Show first 3 experiments
+        for result in task_results[:3]:
             epochs = range(len(result["val_accuracies"]))
             optimizer = result["optimizer_type"]
             color = "blue" if optimizer == "muon" else "red"
@@ -211,7 +198,6 @@ def create_ablation_study_plot(df: pd.DataFrame, output_dir: str = "plots"):
     """
     os.makedirs(output_dir, exist_ok=True)
 
-    # Filter for experiments that achieved grokking
     grokking_df = df[df["grokking_epoch"].notna()].copy()
 
     if len(grokking_df) == 0:
@@ -220,7 +206,6 @@ def create_ablation_study_plot(df: pd.DataFrame, output_dir: str = "plots"):
 
     fig, axes = plt.subplots(2, 2, figsize=(15, 12))
 
-    # 1. Optimizer comparison across all tasks
     ax1 = axes[0, 0]
     optimizer_task_comparison = (
         grokking_df.groupby(["task_type", "optimizer_type"])["grokking_epoch"]
@@ -234,7 +219,6 @@ def create_ablation_study_plot(df: pd.DataFrame, output_dir: str = "plots"):
     ax1.tick_params(axis="x", rotation=45)
     ax1.legend(title="Optimizer")
 
-    # 2. Softmax variant comparison
     ax2 = axes[0, 1]
     softmax_comparison = (
         grokking_df.groupby(["softmax_variant", "optimizer_type"])[
@@ -250,7 +234,6 @@ def create_ablation_study_plot(df: pd.DataFrame, output_dir: str = "plots"):
     ax2.tick_params(axis="x", rotation=45)
     ax2.legend(title="Optimizer")
 
-    # 3. Heatmap of task vs softmax variant
     ax3 = axes[1, 0]
     heatmap_data = (
         grokking_df.groupby(["task_type", "softmax_variant"])["grokking_epoch"]
@@ -260,7 +243,6 @@ def create_ablation_study_plot(df: pd.DataFrame, output_dir: str = "plots"):
     sns.heatmap(heatmap_data, annot=True, fmt=".1f", cmap="viridis", ax=ax3)
     ax3.set_title("Grokking Epochs: Task vs Softmax Variant")
 
-    # 4. Distribution comparison
     ax4 = axes[1, 1]
     muon_data = grokking_df[grokking_df["optimizer_type"] == "muon"][
         "grokking_epoch"
@@ -291,10 +273,8 @@ def create_summary_table(df: pd.DataFrame, output_dir: str = "plots"):
     """
     os.makedirs(output_dir, exist_ok=True)
 
-    # Create summary statistics
     summary_stats = []
 
-    # Overall statistics
     total_experiments = len(df)
     grokking_experiments = len(df[df["grokking_epoch"].notna()])
 
@@ -313,7 +293,6 @@ def create_summary_table(df: pd.DataFrame, output_dir: str = "plots"):
         }
     )
 
-    # Optimizer comparison
     for optimizer in ["muon", "adamw"]:
         optimizer_df = df[df["optimizer_type"] == optimizer]
         optimizer_grokking = optimizer_df[
@@ -339,14 +318,11 @@ def create_summary_table(df: pd.DataFrame, output_dir: str = "plots"):
                 }
             )
 
-    # Create table
     summary_df = pd.DataFrame(summary_stats)
 
-    # Save as CSV
     summary_file = os.path.join(output_dir, "summary_statistics.csv")
     summary_df.to_csv(summary_file, index=False)
 
-    # Create a nice formatted table
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.axis("tight")
     ax.axis("off")
@@ -397,32 +373,25 @@ def main():
 
     args = parser.parse_args()
 
-    # Load results
     print(f"Loading results from {args.results_file}")
     results = load_results(args.results_file)
 
-    # Convert to DataFrame
     df = pd.DataFrame(results)
 
     print(f"Loaded {len(results)} experiment results")
     print(f"DataFrame shape: {df.shape}")
 
-    # Create visualizations
     print("\nCreating visualizations...")
 
-    # 1. Grokking comparison plot
     print("Creating grokking comparison plot...")
     create_grokking_comparison_plot(df, args.output_dir)
 
-    # 2. Learning curves
     print("Creating learning curves...")
     create_learning_curves_plot(results, args.output_dir)
 
-    # 3. Ablation study
     print("Creating ablation study plots...")
     create_ablation_study_plot(df, args.output_dir)
 
-    # 4. Summary table
     print("Creating summary table...")
     summary_df = create_summary_table(df, args.output_dir)
 

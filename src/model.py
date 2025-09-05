@@ -46,7 +46,6 @@ class RMSNorm(nn.Module):
         Returns:
             Normalized tensor of same shape as input
         """
-        # Calculate RMS
         rms = torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)
         return x * rms * self.weight
 
@@ -88,9 +87,8 @@ class RotaryPositionalEmbedding(nn.Module):
         cos = torch.cos(freqs)
         sin = torch.sin(freqs)
 
-        # Expand to match query/key dimensions
-        cos = cos.unsqueeze(0).unsqueeze(0)  # [1, 1, seq_len, dim//2]
-        sin = sin.unsqueeze(0).unsqueeze(0)  # [1, 1, seq_len, dim//2]
+        cos = cos.unsqueeze(0).unsqueeze(0)
+        sin = sin.unsqueeze(0).unsqueeze(0)
 
         return cos, sin
 
@@ -125,18 +123,12 @@ def apply_rotary_pos_emb(
     Returns:
         Tuple of (rotated_q, rotated_k) tensors
     """
-    # q, k: [batch, heads, seq_len, head_dim]
-    # cos, sin: [1, 1, seq_len, head_dim//2]
-
-    # Extract the first half of the head dimension for rotation
     q_half = q[..., : q.shape[-1] // 2]
     k_half = k[..., : k.shape[-1] // 2]
 
-    # Apply rotation
     q_rotated = q_half * cos + rotate_half(q_half) * sin
     k_rotated = k_half * cos + rotate_half(k_half) * sin
 
-    # Concatenate with the second half (unchanged)
     q_out = torch.cat([q_rotated, q[..., q.shape[-1] // 2 :]], dim=-1)
     k_out = torch.cat([k_rotated, k[..., k.shape[-1] // 2 :]], dim=-1)
 
@@ -193,21 +185,16 @@ class MultiHeadAttention(nn.Module):
             qkv,
         )
 
-        # Apply RoPE
         rope_emb = self.rope(x, seq_len)
         cos, sin = rope_emb
-
-        # Apply rotary embeddings to query and key
         q, k = apply_rotary_pos_emb(q, k, cos, sin)
 
-        # Attention
         att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(self.head_dim))
         if mask is not None:
             att = att.masked_fill(mask == 0, float("-inf"))
         att = F.softmax(att, dim=-1)
         att = self.dropout(att)
 
-        # Output
         out = (
             (att @ v).transpose(1, 2).reshape(batch_size, seq_len, hidden_size)
         )
@@ -312,13 +299,11 @@ class GrokkingTransformer(nn.Module):
         """
         super().__init__()
 
-        # Handle both config object and individual parameters
         if isinstance(config, ModelConfig):
             model_config = config
         elif isinstance(config, dict):
             model_config = ModelConfig(**config)
         else:
-            # Extract parameters from kwargs
             model_config = ModelConfig(
                 vocab_size=kwargs.get("vocab_size", 128),
                 hidden_size=kwargs.get("hidden_size", 128),
@@ -336,36 +321,28 @@ class GrokkingTransformer(nn.Module):
 
         # Identity embeddings as mentioned in paper: "simple identity embeddings where
         # the integer value itself is used as the embedding index (e.g., token '42' maps to embedding vector 42)"
-        # This means we use the token ID directly as the embedding vector
         self.embedding = nn.Embedding(
             model_config.vocab_size, model_config.hidden_size, padding_idx=0
         )
 
         # Initialize embeddings to true identity behavior as described in paper
         with torch.no_grad():
-            # For special tokens, use small random initialization
             special_tokens_count = 12  # Based on dataset.py special tokens
             self.embedding.weight[:special_tokens_count] = (
                 torch.randn(special_tokens_count, model_config.hidden_size)
                 * 0.02
             )
 
-            # For number tokens, use identity-like initialization
             # Each number token gets an embedding that represents the number itself
             for i in range(special_tokens_count, model_config.vocab_size):
                 number_value = i - special_tokens_count
-                # Create a sparse representation where the number value is encoded
-                # Use a combination of positional encoding and value encoding
                 embedding_vector = torch.zeros(model_config.hidden_size)
 
-                # Encode the number value in the first few dimensions
                 if number_value < model_config.hidden_size // 2:
                     embedding_vector[number_value] = 1.0
-                    # Add some positional information in higher dimensions
                     if number_value * 2 < model_config.hidden_size:
                         embedding_vector[number_value * 2] = 0.5
                 else:
-                    # For larger numbers, use a more distributed representation
                     embedding_vector[
                         number_value % (model_config.hidden_size // 2)
                     ] = 1.0
@@ -375,9 +352,6 @@ class GrokkingTransformer(nn.Module):
                     ] = 1.0
 
                 self.embedding.weight[i] = embedding_vector
-
-        # Positional encoding (RoPE is applied in attention, not here)
-        # Remove the learned positional embeddings since we use RoPE
 
         # Transformer blocks
         self.blocks = nn.ModuleList(
@@ -392,15 +366,10 @@ class GrokkingTransformer(nn.Module):
             ]
         )
 
-        # Final layer norm
         self.norm = RMSNorm(model_config.hidden_size)
-
-        # Output projection
         self.output = nn.Linear(
             model_config.hidden_size, model_config.vocab_size, bias=False
         )
-
-        # Initialize weights
         self.apply(self._init_weights)
 
     def _init_weights(self, module: nn.Module) -> None:
@@ -432,23 +401,17 @@ class GrokkingTransformer(nn.Module):
         Returns:
             Output logits of shape [batch_size, seq_len, vocab_size]
         """
-        # Handle different input shapes
         input_dim_3d = 3
         if x.dim() == input_dim_3d:
             batch_size, seq_len, _ = x.shape
-            # If input is 3D, assume it's already embedded
             embedded = x
         else:
             batch_size, seq_len = x.shape
-            # Embeddings
             embedded = self.embedding(x)
-            # No positional embedding addition since we use RoPE in attention
 
-        # Apply transformer blocks
         for block in self.blocks:
             embedded = block(embedded, mask)
 
-        # Final norm and output
         embedded = self.norm(embedded)
         return self.output(embedded)
 
@@ -526,19 +489,14 @@ class SoftmaxVariants:
         z = logits / temperature
         z_sorted, _ = torch.sort(z, dim=-1, descending=True)
 
-        # Find the threshold tau using the efficient algorithm
         cumsum = torch.cumsum(z_sorted, dim=-1)
         range_vals = torch.arange(
             1, z_sorted.shape[-1] + 1, device=z.device, dtype=z.dtype
         )
 
-        # Find k (number of active elements)
         threshold = z_sorted - (cumsum - 1) / range_vals
         valid = threshold > 0
         k = torch.sum(valid, dim=-1, keepdim=True)
 
-        # Compute tau
         tau = (torch.sum(z_sorted * valid, dim=-1, keepdim=True) - 1) / k
-
-        # Apply sparsemax transformation: max{z - tau, 0}
         return torch.clamp(z - tau, min=0)

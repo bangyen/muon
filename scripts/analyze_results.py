@@ -29,16 +29,13 @@ def analyze_grokking_results(results: list[dict[str, Any]]) -> dict[str, Any]:
     Returns:
         Dictionary containing statistical analysis results
     """
-    # Convert to DataFrame for easier analysis
     df = pd.DataFrame(results)
 
-    # Filter out experiments that didn't achieve grokking
     grokking_results = df[df["grokking_epoch"].notna()].copy()
 
     if len(grokking_results) == 0:
         return {"error": "No grokking detected in any experiments"}
 
-    # Separate by optimizer
     muon_results = grokking_results[
         grokking_results["optimizer_type"] == "muon"
     ]
@@ -49,22 +46,18 @@ def analyze_grokking_results(results: list[dict[str, Any]]) -> dict[str, Any]:
     if len(muon_results) == 0 or len(adamw_results) == 0:
         return {"error": "Need both Muon and AdamW results for comparison"}
 
-    # Extract grokking epochs
     muon_epochs = muon_results["grokking_epoch"].values
     adamw_epochs = adamw_results["grokking_epoch"].values
 
-    # Calculate statistics
     muon_mean = np.mean(muon_epochs)
     adamw_mean = np.mean(adamw_epochs)
     muon_std = np.std(muon_epochs, ddof=1)
     adamw_std = np.std(adamw_epochs, ddof=1)
 
-    # Perform two-sample t-test
     t_stat, p_value = stats.ttest_ind(
         muon_epochs, adamw_epochs, equal_var=False
     )
 
-    # Calculate effect size (Cohen's d)
     pooled_std = np.sqrt(
         (
             (len(muon_epochs) - 1) * muon_std**2
@@ -74,7 +67,6 @@ def analyze_grokking_results(results: list[dict[str, Any]]) -> dict[str, Any]:
     )
     cohens_d = (adamw_mean - muon_mean) / pooled_std
 
-    # Calculate speedup
     speedup = adamw_mean / muon_mean if muon_mean > 0 else float("inf")
 
     return {
@@ -131,7 +123,6 @@ def print_analysis_results(analysis: dict[str, Any]) -> None:
     print(f"  Speedup:     {comparison['speedup']:.2f}x")
     print(f"  Significant: {'Yes' if comparison['significant'] else 'No'}")
 
-    # Compare with paper results
     print("\nComparison with Paper Results:")
     paper_muon_mean = 102.89
     paper_adamw_mean = 153.09
@@ -215,19 +206,15 @@ def main():
 
     args = parser.parse_args()
 
-    # Load results
     results = load_results(args.results_file)
 
-    # Perform analysis
     analysis = analyze_grokking_results(results)
 
-    # Print results
     print_analysis_results(analysis)
 
     if args.detailed:
         analyze_by_task_and_softmax(results)
 
-    # Save analysis if requested
     if args.output_file:
         with open(args.output_file, "w") as f:
             json.dump(analysis, f, indent=2)
