@@ -10,7 +10,7 @@ grokking experiments.
 
 import math
 from dataclasses import dataclass
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, cast
 
 import torch
 import torch.nn.functional as F
@@ -208,7 +208,7 @@ class MultiHeadAttention(nn.Module):
         out = (
             (att @ v).transpose(1, 2).reshape(batch_size, seq_len, hidden_size)
         )
-        return self.proj(out)
+        return cast("torch.Tensor", self.proj(out))
 
 
 class FeedForward(nn.Module):
@@ -244,7 +244,7 @@ class FeedForward(nn.Module):
         Returns:
             Output tensor after feed-forward transformation
         """
-        return self.net(x)
+        return cast("torch.Tensor", self.net(x))
 
 
 class TransformerBlock(nn.Module):
@@ -286,7 +286,7 @@ class TransformerBlock(nn.Module):
             Output tensor after transformer block processing
         """
         x = x + self.attention(self.norm1(x), mask)
-        return x + self.feed_forward(self.norm2(x))
+        return cast("torch.Tensor", x + self.feed_forward(self.norm2(x)))
 
 
 class GrokkingTransformer(nn.Module):
@@ -423,7 +423,7 @@ class GrokkingTransformer(nn.Module):
             embedded = block(embedded, mask)
 
         embedded = self.norm(embedded)
-        return self.output(embedded)
+        return cast("torch.Tensor", self.output(embedded))
 
 
 class SoftmaxVariants:
