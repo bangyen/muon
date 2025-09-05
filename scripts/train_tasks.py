@@ -411,15 +411,16 @@ def run_comprehensive_experiments(
             "grokking_threshold": 0.95,  # Paper threshold
         }
     else:
-        # Model sized to delay grokking for meaningful comparison
+        # Model sized to match paper specifications for delayed grokking
+        # Paper uses larger models to achieve the ~150 epoch grokking delay
         model_config = {
-            "hidden_size": 64,  # Smaller to delay grokking
-            "num_layers": 3,  # Fewer layers to delay grokking
-            "num_heads": 4,  # Fewer heads
-            "ff_size": 256,  # Smaller feedforward
+            "hidden_size": 128,  # Match paper default (from ModelConfig)
+            "num_layers": 4,  # Match paper default (from ModelConfig)
+            "num_heads": 8,  # Match paper default (from ModelConfig)
+            "ff_size": 512,  # Match paper default (from ModelConfig)
             "max_seq_len": 10,  # Sufficient for arithmetic expressions
             "batch_size": 64,  # Standard batch size
-            "dropout": 0.2,  # Higher dropout to delay grokking
+            "dropout": 0.1,  # Lower dropout to allow faster learning
             "max_epochs": 1000,  # Sufficient for grokking
             "grokking_threshold": 0.95,  # Paper threshold
         }
@@ -427,14 +428,14 @@ def run_comprehensive_experiments(
     # Optimizer configurations as described in the paper
     # Muon typically needs higher learning rates to be effective
     muon_config = {
-        "lr": 0.002,  # Higher learning rate for Muon (as suggested in paper)
-        "betas": (0.9, 0.98),  # For non-hidden parameters (AdamW betas)
+        "lr": 0.02,  # Higher learning rate for Muon (as suggested in paper)
+        "betas": (0.9, 0.95),  # For non-hidden parameters (AdamW betas)
         "weight_decay": 1e-2,  # Equivalent weight decay strength
     }
 
     adamw_config = {
-        "lr": 0.0005,  # Lower learning rate for AdamW
-        "betas": (0.9, 0.98),  # Standard AdamW betas as mentioned in paper
+        "lr": 0.001,  # Lower learning rate for AdamW
+        "betas": (0.9, 0.95),  # Standard AdamW betas as mentioned in paper
         "weight_decay": 1e-2,  # Equivalent weight decay strength
     }
 
