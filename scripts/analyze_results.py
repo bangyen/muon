@@ -256,6 +256,13 @@ def analyze_by_task_and_softmax(results: list[dict[str, Any]]) -> None:
 
 
 def main():
+    """
+    Main entry point for the analysis script.
+
+    Parses command line arguments and performs statistical analysis of grokking
+    experiment results, comparing Muon optimizer performance with AdamW across
+    different tasks and softmax variants.
+    """
     parser = argparse.ArgumentParser(
         description="Analyze Muon Optimizer grokking experiment results"
     )

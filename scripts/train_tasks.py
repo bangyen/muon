@@ -1,3 +1,12 @@
+"""
+Training script for grokking experiments.
+
+This script implements the training pipeline for reproducing the results from
+the "Muon Optimizer Accelerates Grokking" paper. It supports training transformer
+models on modular arithmetic tasks using both Muon and AdamW optimizers,
+with comprehensive experiment tracking and result saving.
+"""
+
 import argparse
 import json
 import os
@@ -539,6 +548,13 @@ def save_results(results: list[dict], output_dir: str = "results"):
 
 
 def main():
+    """
+    Main entry point for the training script.
+
+    Parses command line arguments and runs comprehensive grokking experiments
+    comparing Muon optimizer with AdamW across different tasks and softmax variants.
+    Results are saved to JSON files for later analysis.
+    """
     parser = argparse.ArgumentParser(
         description="Run Muon Optimizer grokking experiments"
     )

@@ -1,3 +1,13 @@
+"""
+Model module for grokking transformer architecture.
+
+This module provides the GrokkingTransformer class and related components
+for implementing the transformer architecture described in the "Muon Optimizer
+Accelerates Grokking" paper. It includes RMS normalization, rotary positional
+embeddings, multi-head attention, and various softmax variants used in the
+grokking experiments.
+"""
+
 import math
 from dataclasses import dataclass
 from typing import Any, Optional, Union

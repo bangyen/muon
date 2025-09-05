@@ -1,3 +1,13 @@
+"""
+Dataset module for modular arithmetic tasks.
+
+This module provides the ModularArithmeticDataset class and related utilities
+for generating and processing modular arithmetic data as described in the
+"Muon Optimizer Accelerates Grokking" paper. It supports various arithmetic
+operations including addition, multiplication, division, exponentiation, GCD,
+and parity tasks.
+"""
+
 import random
 from dataclasses import dataclass
 from typing import Any, Union
