@@ -49,6 +49,7 @@ class ModularArithmeticDataset(Dataset[dict[str, Union[torch.Tensor, int]]]):
 
         if config.task_type not in [
             "add",
+            "sub",
             "mul",
             "div",
             "exp",
@@ -97,6 +98,12 @@ class ModularArithmeticDataset(Dataset[dict[str, Union[torch.Tensor, int]]]):
             for a in range(self.modulus):
                 for b in range(self.modulus):
                     result = (a + b) % self.modulus
+                    data.append((a, b, result))
+
+        elif self.task_type == "sub":
+            for a in range(self.modulus):
+                for b in range(self.modulus):
+                    result = (a - b) % self.modulus
                     data.append((a, b, result))
 
         elif self.task_type == "mul":
@@ -166,12 +173,13 @@ class ModularArithmeticDataset(Dataset[dict[str, Union[torch.Tensor, int]]]):
             "<bos>": 3,
             "=": 4,
             "+": 5,
-            "*": 6,
-            "/": 7,
-            "^": 8,
-            "gcd": 9,
-            "mod": 10,
-            "parity": 11,
+            "-": 6,
+            "*": 7,
+            "/": 8,
+            "^": 9,
+            "gcd": 10,
+            "mod": 11,
+            "parity": 12,
         }
 
         # Number tokens (0 to modulus-1)
@@ -204,6 +212,7 @@ class ModularArithmeticDataset(Dataset[dict[str, Union[torch.Tensor, int]]]):
         # For modular arithmetic: [<bos>, a, op, b, =, result, <eos>]
         op_token = {
             "add": self.vocab["+"],
+            "sub": self.vocab["-"],
             "mul": self.vocab["*"],
             "div": self.vocab["/"],
             "exp": self.vocab["^"],
@@ -310,6 +319,10 @@ def get_task_configs() -> dict[str, dict[str, Union[int, float]]]:
             "modulus": 97,
             "train_split": 0.8,
         },  # Addition, mod 97, 80% train split
+        "sub": {
+            "modulus": 97,
+            "train_split": 0.8,
+        },  # Subtraction, mod 97, 80% train split
         "div": {
             "modulus": 97,
             "train_split": 0.8,

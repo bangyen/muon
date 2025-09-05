@@ -299,24 +299,41 @@ def run_experiment(config: ExperimentConfig) -> dict:
 
     # Create optimizer
     if config.optimizer_type == "muon":
-        # Use original Muon implementation with proper parameter grouping
-        # Hidden weights (2D+ parameters) use Muon, others use AdamW
-        hidden_weights = [p for p in model.parameters() if p.ndim >= 2]
-        other_params = [p for p in model.parameters() if p.ndim < 2]
+        # Use Muon more selectively - only for weight matrices that map dense to dense
+        # Avoid applying Muon to embeddings, biases, layer norm scales, etc.
+        muon_params = []
+        adamw_params = []
+
+        for name, param in model.named_parameters():
+            # Apply Muon only to weight matrices in attention and feed-forward layers
+            if (
+                param.ndim >= 2
+                and (
+                    "attention" in name
+                    or "feed_forward" in name
+                    or "blocks" in name
+                )
+                and "weight" in name
+                and "embedding" not in name
+                and "norm" not in name
+            ):
+                muon_params.append(param)
+            else:
+                adamw_params.append(param)
 
         param_groups = [
             dict(
-                params=hidden_weights,
+                params=muon_params,
                 use_muon=True,
                 lr=config.optimizer_config["lr"],
                 momentum=0.95,  # Default Muon momentum
                 weight_decay=config.optimizer_config["weight_decay"],
             ),
             dict(
-                params=other_params,
+                params=adamw_params,
                 use_muon=False,
                 lr=config.optimizer_config["lr"]
-                * 0.1,  # Lower LR for non-hidden params
+                * 0.1,  # Lower LR for non-Muon params
                 betas=config.optimizer_config["betas"],
                 weight_decay=config.optimizer_config["weight_decay"],
             ),
@@ -408,15 +425,15 @@ def run_comprehensive_experiments(
         }
 
     # Optimizer configurations as described in the paper
-    # Both optimizers configured with equivalent weight decay strengths to isolate impact
+    # Muon typically needs higher learning rates to be effective
     muon_config = {
-        "lr": 0.0005,  # Lower learning rate to delay grokking
+        "lr": 0.002,  # Higher learning rate for Muon (as suggested in paper)
         "betas": (0.9, 0.98),  # For non-hidden parameters (AdamW betas)
         "weight_decay": 1e-2,  # Equivalent weight decay strength
     }
 
     adamw_config = {
-        "lr": 0.0005,  # Equivalent learning rate for fair comparison
+        "lr": 0.0005,  # Lower learning rate for AdamW
         "betas": (0.9, 0.98),  # Standard AdamW betas as mentioned in paper
         "weight_decay": 1e-2,  # Equivalent weight decay strength
     }
@@ -429,7 +446,7 @@ def run_comprehensive_experiments(
         optimizer_types = ["muon", "adamw"]  # Compare both optimizers
     else:
         # Full: all configurations
-        task_types = ["gcd", "add", "div", "exp", "mul", "parity"]
+        task_types = ["gcd", "add", "sub", "div", "exp", "mul", "parity"]
         softmax_variants = ["standard", "stablemax", "sparsemax"]
         optimizer_types = ["muon", "adamw"]
 
