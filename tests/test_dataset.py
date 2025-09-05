@@ -279,6 +279,166 @@ class TestModularArithmeticDataset:
         estimated_size = len(dataset.data) * 3 * 8
         assert estimated_size < 1e6
 
+    def test_dataset_config_object(self):
+        """Test dataset initialization with DatasetConfig object"""
+        set_seed(42)
+
+        from src.dataset import DatasetConfig
+
+        config = DatasetConfig(
+            task_type="add",
+            modulus=97,
+            train_split=0.5,
+            max_seq_len=5,
+            seed=42,
+        )
+
+        dataset = ModularArithmeticDataset(config)
+
+        assert dataset.task_type == "add"
+        assert dataset.modulus == 97
+        assert dataset.train_split == 0.5
+        assert dataset.max_seq_len == 5
+        assert dataset.seed == 42
+
+    def test_division_task_value_error(self):
+        """Test division task with values that cause ValueError in modular inverse"""
+        set_seed(42)
+
+        # Create a dataset with a modulus that has non-coprime values
+        dataset = ModularArithmeticDataset(
+            "div", modulus=4
+        )  # 4 has non-coprime values
+
+        # The division task should skip values where modular inverse doesn't exist
+        # This tests the ValueError handling in the division generation
+        assert len(dataset.data) > 0
+
+    def test_tokenize_parity_task(self):
+        """Test tokenization for parity task specifically"""
+        set_seed(42)
+
+        dataset = ModularArithmeticDataset("parity", modulus=2)
+
+        # Test the parity tokenization path
+        tokens = dataset._tokenize(5, 0, 1)  # 5, 0, parity=1
+
+        assert len(tokens) == 3
+        assert tokens[0] == dataset.vocab["<bos>"]
+        assert tokens[1] == 5 + len(dataset.special_tokens)  # token_index
+        assert tokens[2] == dataset.vocab["<eos>"]
+
+    def test_sequence_padding_and_truncation(self):
+        """Test sequence padding and truncation in __getitem__"""
+        set_seed(42)
+
+        # Test padding case
+        dataset_short = ModularArithmeticDataset(
+            "add", modulus=97, max_seq_len=10
+        )
+        sample_short = dataset_short[0]
+
+        assert sample_short["input"].shape[0] == 10
+        assert sample_short["target"].shape[0] == 10
+
+        # Test truncation case
+        dataset_long = ModularArithmeticDataset(
+            "add", modulus=97, max_seq_len=3
+        )
+        sample_long = dataset_long[0]
+
+        assert sample_long["input"].shape[0] == 3
+        assert sample_long["target"].shape[0] == 3
+
+    def test_get_val_data_method(self):
+        """Test the get_val_data method"""
+        set_seed(42)
+
+        dataset = ModularArithmeticDataset("add", modulus=97)
+
+        val_data = dataset.get_val_data()
+
+        assert len(val_data) == len(dataset.val_data)
+
+        for sample in val_data[:5]:  # Test first 5 samples
+            assert "input" in sample
+            assert "target" in sample
+            assert "result" in sample
+            assert isinstance(sample["input"], torch.Tensor)
+            assert isinstance(sample["target"], torch.Tensor)
+            assert isinstance(sample["result"], int)
+
+    def test_get_val_data_method_truncation(self):
+        """Test the get_val_data method with sequence truncation"""
+        set_seed(42)
+
+        # Use a very short max_seq_len to trigger truncation
+        dataset = ModularArithmeticDataset("add", modulus=97, max_seq_len=2)
+
+        val_data = dataset.get_val_data()
+
+        assert len(val_data) == len(dataset.val_data)
+
+        for sample in val_data[:5]:  # Test first 5 samples
+            assert "input" in sample
+            assert "target" in sample
+            assert "result" in sample
+            assert isinstance(sample["input"], torch.Tensor)
+            assert isinstance(sample["target"], torch.Tensor)
+            assert isinstance(sample["result"], int)
+            # Check that sequences are truncated to max_seq_len
+            assert sample["input"].shape[0] == 2
+            assert sample["target"].shape[0] == 2
+
+    def test_get_val_data_method_padding(self):
+        """Test the get_val_data method with sequence padding"""
+        set_seed(42)
+
+        # Use a longer max_seq_len to trigger padding
+        dataset = ModularArithmeticDataset("add", modulus=97, max_seq_len=20)
+
+        val_data = dataset.get_val_data()
+
+        assert len(val_data) == len(dataset.val_data)
+
+        for sample in val_data[:5]:  # Test first 5 samples
+            assert "input" in sample
+            assert "target" in sample
+            assert "result" in sample
+            assert isinstance(sample["input"], torch.Tensor)
+            assert isinstance(sample["target"], torch.Tensor)
+            assert isinstance(sample["result"], int)
+            # Check that sequences are padded to max_seq_len
+            assert sample["input"].shape[0] == 20
+            assert sample["target"].shape[0] == 20
+
+    def test_create_dataloader_function(self):
+        """Test the create_dataloader function"""
+        set_seed(42)
+
+        from src.dataset import create_dataloader
+
+        dataset = ModularArithmeticDataset("add", modulus=97)
+        dataloader = create_dataloader(dataset, batch_size=4, shuffle=False)
+
+        batch = next(iter(dataloader))
+        assert batch["input"].shape[0] == 4
+
+    def test_get_task_configs_function(self):
+        """Test the get_task_configs function"""
+        from src.dataset import get_task_configs
+
+        configs = get_task_configs()
+
+        expected_tasks = ["gcd", "add", "div", "exp", "mul", "parity"]
+        assert all(task in configs for task in expected_tasks)
+
+        for task, config in configs.items():
+            assert "modulus" in config
+            assert "train_split" in config
+            assert isinstance(config["modulus"], int)
+            assert isinstance(config["train_split"], float)
+
 
 class TestDatasetIntegration:
     """Test integration between dataset and other components"""

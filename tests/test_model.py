@@ -9,6 +9,7 @@ These tests validate the model architecture including:
 - Positional embeddings
 """
 
+import pytest
 import torch
 from torch import nn
 
@@ -402,3 +403,170 @@ class TestModelIntegration:
             assert original_output.shape == loaded_output.shape
 
             os.unlink(f.name)
+
+    def test_rotary_positional_embeddings_with_seq_len(self):
+        """Test rotary positional embeddings with explicit seq_len parameter"""
+        set_seed(42)
+
+        dim = 64
+        max_seq_len = 512
+        batch_size = 4
+        seq_len = 16
+
+        rope = RotaryPositionalEmbedding(dim, max_seq_len)
+
+        x = torch.randn(batch_size, seq_len, dim)
+
+        with torch.no_grad():
+            # Test with explicit seq_len parameter
+            cos, sin = rope(x, seq_len=8)
+
+        assert cos.shape == (1, 1, 8, dim // 2)
+        assert sin.shape == (1, 1, 8, dim // 2)
+
+        assert torch.all(torch.isfinite(cos))
+        assert torch.all(torch.isfinite(sin))
+
+    def test_rotary_positional_embeddings_with_none_seq_len(self):
+        """Test rotary positional embeddings with seq_len=None (default behavior)"""
+        set_seed(42)
+
+        dim = 64
+        max_seq_len = 512
+        batch_size = 4
+        seq_len = 16
+
+        rope = RotaryPositionalEmbedding(dim, max_seq_len)
+
+        x = torch.randn(batch_size, seq_len, dim)
+
+        with torch.no_grad():
+            # Test with seq_len=None (should use x.shape[1])
+            cos, sin = rope(x, seq_len=None)
+
+        assert cos.shape == (1, 1, seq_len, dim // 2)
+        assert sin.shape == (1, 1, seq_len, dim // 2)
+
+        assert torch.all(torch.isfinite(cos))
+        assert torch.all(torch.isfinite(sin))
+
+    def test_multihead_attention_invalid_head_dimension(self):
+        """Test multi-head attention with invalid head dimension"""
+        set_seed(42)
+
+        hidden_size = 65  # Not divisible by num_heads
+        num_heads = 4
+
+        with pytest.raises(
+            ValueError,
+            match="hidden_size \\(65\\) must be divisible by num_heads \\(4\\)",
+        ):
+            MultiHeadAttention(hidden_size, num_heads)
+
+    def test_attention_with_mask(self):
+        """Test multi-head attention with attention mask"""
+        set_seed(42)
+
+        hidden_size = 64
+        num_heads = 4
+        batch_size = 2
+        seq_len = 8
+
+        attention = MultiHeadAttention(hidden_size, num_heads)
+
+        x = torch.randn(batch_size, seq_len, hidden_size)
+
+        # Create a causal mask
+        mask = (
+            torch.tril(torch.ones(seq_len, seq_len)).unsqueeze(0).unsqueeze(0)
+        )
+        mask = mask.expand(batch_size, num_heads, seq_len, seq_len)
+
+        with torch.no_grad():
+            output = attention(x, mask)
+
+        assert output.shape == (batch_size, seq_len, hidden_size)
+        assert torch.all(torch.isfinite(output))
+
+    def test_model_config_object_initialization(self):
+        """Test model initialization with ModelConfig object"""
+        set_seed(42)
+
+        from src.model import ModelConfig
+
+        config = ModelConfig(
+            vocab_size=128,
+            hidden_size=64,
+            num_layers=2,
+            num_heads=4,
+            ff_size=128,
+            max_seq_len=10,
+            dropout=0.1,
+            softmax_variant="standard",
+        )
+
+        model = GrokkingTransformer(config)
+
+        assert model.vocab_size == 128
+        assert model.hidden_size == 64
+        assert len(model.blocks) == 2
+
+    def test_model_dict_config_initialization(self):
+        """Test model initialization with dict config"""
+        set_seed(42)
+
+        config_dict = {
+            "vocab_size": 128,
+            "hidden_size": 64,
+            "num_layers": 2,
+            "num_heads": 4,
+            "ff_size": 128,
+            "max_seq_len": 10,
+            "dropout": 0.1,
+            "softmax_variant": "standard",
+        }
+
+        model = GrokkingTransformer(config_dict)
+
+        assert model.vocab_size == 128
+        assert model.hidden_size == 64
+        assert len(model.blocks) == 2
+
+    def test_model_weight_initialization_with_bias(self):
+        """Test model weight initialization for modules with bias"""
+        set_seed(42)
+
+        # Create a simple linear layer with bias to test bias initialization
+        linear_with_bias = torch.nn.Linear(10, 5, bias=True)
+
+        # Test the _init_weights method on a module with bias
+        model = GrokkingTransformer(vocab_size=128, hidden_size=64)
+
+        # Manually call _init_weights on a linear layer with bias
+        model._init_weights(linear_with_bias)
+
+        # Check that bias was initialized to zeros
+        assert torch.allclose(
+            linear_with_bias.bias, torch.zeros_like(linear_with_bias.bias)
+        )
+
+    def test_model_forward_with_3d_input(self):
+        """Test model forward pass with 3D input tensor"""
+        set_seed(42)
+
+        config = TestConfig.TEST_MODEL_CONFIG
+        model = GrokkingTransformer(**config)
+
+        batch_size = 4
+        seq_len = 7
+        hidden_size = config["hidden_size"]
+
+        # Create 3D input tensor (already embedded)
+        x_3d = torch.randn(batch_size, seq_len, hidden_size)
+
+        with torch.no_grad():
+            output = model(x_3d)
+
+        expected_shape = (batch_size, seq_len, config["vocab_size"])
+        assert output.shape == expected_shape
+        assert torch.all(torch.isfinite(output))
