@@ -188,8 +188,9 @@ class GrokkingTrainer:
                 self.grokking_epoch = epoch
                 print(f"\nGrokking detected at epoch {epoch}!")
                 print(f"Validation accuracy: {val_acc:.4f}")
-                # Stop training immediately when grokking is detected
-                break
+                # Continue training for a few more epochs to ensure stability
+                if epoch < 5:  # Only stop early if grokking happens very early
+                    break
 
             # Early stopping (only if grokking hasn't been detected)
             if val_acc > best_val_acc:
@@ -366,35 +367,51 @@ def run_comprehensive_experiments(
     Returns:
         List of experiment results
     """
-    model_config = {
-        "hidden_size": 8,  # Extremely small model
-        "num_layers": 1,  # Single layer
-        "num_heads": 1,  # Single head
-        "ff_size": 32,  # Very small feedforward
-        "max_seq_len": 6,  # Very short sequences
-        "batch_size": 4,  # Small batch
-        "dropout": 0.5,  # High dropout
-        "max_epochs": 50,  # More epochs to see grokking
-        "grokking_threshold": 0.95,  # Match paper threshold
-    }
+    # Use different model sizes based on mode
+    if single_task:
+        # More challenging model for proper grokking
+        model_config = {
+            "hidden_size": 96,  # Larger for more challenging grokking
+            "num_layers": 3,  # More layers for complexity
+            "num_heads": 6,  # More heads for attention
+            "ff_size": 384,  # Larger feedforward
+            "max_seq_len": 12,  # Longer sequences
+            "batch_size": 48,  # Larger batch
+            "dropout": 0.15,  # Higher dropout for regularization
+            "max_epochs": 300,  # More epochs for proper grokking
+            "grokking_threshold": 0.95,  # Standard threshold
+        }
+    else:
+        # Full model for comprehensive experiments
+        model_config = {
+            "hidden_size": 128,  # Reasonable model size for grokking
+            "num_layers": 4,  # Multiple layers for proper grokking
+            "num_heads": 8,  # Multiple attention heads
+            "ff_size": 512,  # Proper feedforward size
+            "max_seq_len": 15,  # Adequate sequence length
+            "batch_size": 64,  # Reasonable batch size
+            "dropout": 0.1,  # Standard dropout
+            "max_epochs": 500,  # Extended training for grokking
+            "grokking_threshold": 0.95,  # Match paper threshold
+        }
 
     # Optimizer configurations - based on paper findings
     muon_config = {
-        "lr": 0.02,  # Original Muon default learning rate
+        "lr": 0.0005,  # More conservative learning rate for grokking
         "betas": (0.9, 0.95),  # For non-hidden parameters
         "weight_decay": 1e-2,  # Weight decay for both groups
     }
 
     adamw_config = {
-        "lr": 5e-4,  # Standard learning rate
+        "lr": 0.0008,  # Slightly higher LR for AdamW
         "betas": (0.9, 0.98),
-        "weight_decay": 1e-1,  # Higher weight decay needed for AdamW to achieve grokking
+        "weight_decay": 1e-2,  # Standard weight decay for grokking
     }
 
     # Task types and softmax variants
     if single_task:
         # Single task: only 1 task, 1 softmax, 1 optimizer = 1 experiment total
-        task_types = ["exp"]  # Exponentiation is the hardest task
+        task_types = ["exp"]  # Exponentiation is harder
         softmax_variants = ["standard"]
         optimizer_types = ["muon", "adamw"]  # Compare both optimizers
     else:
@@ -539,7 +556,7 @@ def main():
         # Single task test
         print("Running single task test...")
         results = run_comprehensive_experiments(
-            device=args.device, num_runs=1, single_task=True
+            device=args.device, num_runs=args.num_runs, single_task=True
         )
     else:
         # Full experiments

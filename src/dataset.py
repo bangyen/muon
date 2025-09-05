@@ -194,8 +194,8 @@ class ModularArithmeticDataset(Dataset[dict[str, Union[torch.Tensor, int]]]):
         if self.task_type == "parity":
             # For parity: [<bos>, number, <eos>] -> parity
             # For parity, we need to handle large numbers (up to 1023 for 10-bit)
-            # We'll use modulo to keep it within vocabulary bounds
-            token_index = (a % self.modulus) + len(self.special_tokens)
+            # Use the actual number as token index
+            token_index = a + len(self.special_tokens)
             return [
                 self.vocab["<bos>"],
                 token_index,
@@ -308,7 +308,7 @@ def get_task_configs() -> dict[str, dict[str, Union[int, float]]]:
         "exp": {"modulus": 97, "train_split": 0.7},
         "mul": {"modulus": 97, "train_split": 0.5},
         "parity": {
-            "modulus": 2,
-            "train_split": 0.1,
-        },  # Much smaller train split
+            "modulus": 1024,  # Use full 10-bit range
+            "train_split": 0.5,  # Standard train split
+        },
     }
