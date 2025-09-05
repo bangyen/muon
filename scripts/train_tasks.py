@@ -188,10 +188,17 @@ class GrokkingTrainer:
             self.train_accuracies.append(train_acc)
             self.val_accuracies.append(val_acc)
 
-            # Check for grokking
-            if val_acc >= grokking_threshold and self.grokking_epoch is None:
+            # Check for grokking as defined in the paper:
+            # "the first epoch where validation accuracy reaches or exceeds 95%,
+            # occurring after the training accuracy has already stabilized near 100%"
+            if (
+                val_acc >= grokking_threshold
+                and train_acc >= 0.99  # Training accuracy stabilized near 100%
+                and self.grokking_epoch is None
+            ):
                 self.grokking_epoch = epoch
                 print(f"\nGrokking detected at epoch {epoch}!")
+                print(f"Training accuracy: {train_acc:.4f}")
                 print(f"Validation accuracy: {val_acc:.4f}")
                 # Stop training immediately when grokking is detected
                 break
@@ -371,45 +378,47 @@ def run_comprehensive_experiments(
     Returns:
         List of experiment results
     """
-    # Use different model sizes based on mode
+    # Model configuration based on paper requirements
+    # Paper uses "modern Transformer architecture" - using sizes that delay grokking appropriately
     if single_task:
-        # Smaller model for faster epochs, delayed grokking
+        # Model sized to delay grokking for meaningful comparison
         model_config = {
-            "hidden_size": 32,  # Much smaller for faster epochs
+            "hidden_size": 32,  # Smaller to delay grokking
             "num_layers": 2,  # Fewer layers for speed
             "num_heads": 4,  # Fewer heads for speed
-            "ff_size": 128,  # Much smaller feedforward
-            "max_seq_len": 12,  # Keep same sequence length
-            "batch_size": 48,  # Keep same batch size
+            "ff_size": 128,  # Smaller feedforward
+            "max_seq_len": 10,  # Sufficient for arithmetic expressions
+            "batch_size": 32,  # Standard batch size
             "dropout": 0.2,  # Higher dropout to delay grokking
-            "max_epochs": 1000,  # More epochs since grokking will be delayed
-            "grokking_threshold": 0.95,  # Standard threshold
+            "max_epochs": 1000,  # Sufficient for grokking
+            "grokking_threshold": 0.95,  # Paper threshold
         }
     else:
-        # Smaller model for faster epochs, delayed grokking
+        # Model sized to delay grokking for meaningful comparison
         model_config = {
-            "hidden_size": 48,  # Much smaller for faster epochs
-            "num_layers": 2,  # Fewer layers for speed
-            "num_heads": 4,  # Fewer heads for speed
-            "ff_size": 192,  # Much smaller feedforward
-            "max_seq_len": 15,  # Keep same sequence length
-            "batch_size": 64,  # Keep same batch size
+            "hidden_size": 64,  # Smaller to delay grokking
+            "num_layers": 3,  # Fewer layers to delay grokking
+            "num_heads": 4,  # Fewer heads
+            "ff_size": 256,  # Smaller feedforward
+            "max_seq_len": 10,  # Sufficient for arithmetic expressions
+            "batch_size": 64,  # Standard batch size
             "dropout": 0.2,  # Higher dropout to delay grokking
-            "max_epochs": 1000,  # More epochs since grokking will be delayed
-            "grokking_threshold": 0.95,  # Match paper threshold
+            "max_epochs": 1000,  # Sufficient for grokking
+            "grokking_threshold": 0.95,  # Paper threshold
         }
 
-    # Optimizer configurations - balanced Muon learning rates
+    # Optimizer configurations as described in the paper
+    # Both optimizers configured with equivalent weight decay strengths to isolate impact
     muon_config = {
-        "lr": 0.002,  # Balanced Muon learning rate (between 0.0001 and 0.01)
-        "betas": (0.9, 0.95),  # For non-hidden parameters
-        "weight_decay": 1e-2,  # Moderate weight decay
+        "lr": 0.0005,  # Lower learning rate to delay grokking
+        "betas": (0.9, 0.98),  # For non-hidden parameters (AdamW betas)
+        "weight_decay": 1e-2,  # Equivalent weight decay strength
     }
 
     adamw_config = {
-        "lr": 0.0002,  # Lower learning rate to delay grokking
-        "betas": (0.9, 0.98),
-        "weight_decay": 5e-2,  # Higher weight decay to delay grokking
+        "lr": 0.0005,  # Equivalent learning rate for fair comparison
+        "betas": (0.9, 0.98),  # Standard AdamW betas as mentioned in paper
+        "weight_decay": 1e-2,  # Equivalent weight decay strength
     }
 
     # Task types and softmax variants

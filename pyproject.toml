@@ -40,6 +40,7 @@ dependencies = [
 [project.scripts]
 muon-train = "scripts.train_tasks:main"
 muon-visualize = "scripts.visualize_results:main"
+muon-analyze = "scripts.analyze_results:main"
 
 [project.optional-dependencies]
 dev = [

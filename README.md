@@ -5,8 +5,8 @@ This repository contains a reproduction of the paper **"Muon Optimizer Accelerat
 ## 📋 Paper Summary
 
 **Key Findings:**
-- Muon reduces average grokking epoch from ~153 to ~103 (33% speedup)
-- Statistically significant improvement across 7 modular arithmetic tasks
+- Muon reduces average grokking epoch from 153.09 to 102.89 (33% speedup)
+- Statistically significant improvement (t=5.0175, p=6.33e-08) across 7 modular arithmetic tasks
 - Combines spectral norm constraints, orthogonalized gradients, and second-order information
 
 **Why This Matters:**
@@ -27,14 +27,14 @@ cd muon
 source venv/bin/activate
 
 # Install dependencies
-pip install -r requirements.txt
+pip install -e .
 ```
 
 ### Run Quick Test
 
 ```bash
 # Run a quick test with limited configurations
-python -m scripts.train_tasks --quick_test --device cpu
+python -m scripts.train_tasks --single_task --device cpu
 ```
 
 ### Run Full Experiments
@@ -44,10 +44,17 @@ python -m scripts.train_tasks --quick_test --device cpu
 python -m scripts.train_tasks --device cpu --num_runs 3
 ```
 
+### Analyze Results
+
+```bash
+# Perform statistical analysis matching the paper
+python -m scripts.analyze_results --results_file results/experiment_results_YYYYMMDD_HHMMSS.json
+```
+
 ### Visualize Results
 
 ```bash
-# After running experiments, create visualizations
+# Create visualizations matching paper figures
 python -m scripts.visualize_results --results_file results/experiment_results_YYYYMMDD_HHMMSS.json
 ```
 
@@ -57,24 +64,48 @@ python -m scripts.visualize_results --results_file results/experiment_results_YY
 muon/
 ├── src/
 │   ├── __init__.py
-│   ├── optimizer.py      # Muon optimizer implementation
-│   ├── model.py          # Transformer architecture
-│   └── dataset.py        # Modular arithmetic datasets
+│   ├── model.py          # Transformer architecture with identity embeddings & RoPE
+│   └── dataset.py        # Modular arithmetic datasets (exact paper configs)
 ├── scripts/
-│   ├── train_tasks.py    # Main training script
-│   └── visualize_results.py  # Visualization and analysis
-├── requirements.txt      # Dependencies
+│   ├── train_tasks.py    # Main training script (faithful to paper methodology)
+│   ├── visualize_results.py  # Visualization matching paper figures
+│   └── analyze_results.py   # Statistical analysis matching paper results
+├── tests/
+│   ├── test_model.py     # Model architecture tests
+│   └── test_dataset.py   # Dataset functionality tests
+├── results/              # Experiment results (JSON + CSV)
+├── pyproject.toml         # Project configuration
 └── README.md            # This file
 ```
 
-## 🔬 Implementation Details
+## 🔬 Reproduction Details
 
-### Muon Optimizer Features
+### Exact Paper Implementation
 
-1. **Spectral Norm Constraints**: Prevents runaway weights and "softmax collapse"
-2. **Orthogonalized Gradients**: Promotes broader exploration by reducing update redundancy
-3. **Second-Order Information**: Approximates Hessian diagonal for better update directions
-4. **Layer-wise Scaling**: Matches update size to layer shape for synchronized learning
+This reproduction follows the paper specifications exactly:
+
+1. **Model Architecture**:
+   - Identity embeddings (integer value as embedding index)
+   - Rotary Positional Embeddings (RoPE) in attention
+   - RMSNorm instead of LayerNorm
+   - SiLU activation in feed-forward networks
+
+2. **Dataset Configurations** (Figure 2):
+   - GCD: mod 97, 50% train split
+   - Mod-add: mod 97, 80% train split
+   - Mod-div: mod 97, 80% train split
+   - Mod-exp: mod 97, 70% train split
+   - Mod-mul: mod 97, 50% train split
+   - Parity: 10-bit numbers, 50% train split
+
+3. **Softmax Variants** (Figure 3):
+   - Standard: `softmax(z)_i = exp(z_i) / sum_j exp(z_j)`
+   - Stablemax: `s(z_i) = {z_i + 1 if z_i >= 0, 1/(1-z_i) if z_i < 0}`
+   - Sparsemax: `sparsemax(z)_i = max{z_i - tau, 0}`
+
+4. **Grokking Definition**: First epoch where validation accuracy ≥ 95%, occurring after training accuracy stabilizes near 100%
+
+5. **Statistical Analysis**: Two-sample t-test comparing Muon vs AdamW grokking epochs
 
 ### Tasks Implemented
 

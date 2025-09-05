@@ -12,6 +12,7 @@ def create_grokking_comparison_plot(
 ):
     """
     Create comparison plot showing grokking epochs for Muon vs AdamW
+    Matches Figure 4 from the paper
     """
     os.makedirs(output_dir, exist_ok=True)
 
@@ -22,62 +23,73 @@ def create_grokking_comparison_plot(
         print("No grokking detected in any experiments")
         return None
 
-    # Create comparison plot
-    plt.figure(figsize=(12, 8))
+    # Create the main comparison plot matching Figure 4 from the paper
+    plt.figure(figsize=(10, 6))
 
-    # Box plot comparison
-    plt.subplot(2, 2, 1)
+    # Box plot comparison (main figure)
     sns.boxplot(data=grokking_df, x="optimizer_type", y="grokking_epoch")
-    plt.title("Grokking Epoch Comparison: Muon vs AdamW")
-    plt.ylabel("Grokking Epoch")
-    plt.xlabel("Optimizer")
-
-    # Violin plot for distribution
-    plt.subplot(2, 2, 2)
-    sns.violinplot(data=grokking_df, x="optimizer_type", y="grokking_epoch")
-    plt.title("Distribution of Grokking Epochs")
-    plt.ylabel("Grokking Epoch")
-    plt.xlabel("Optimizer")
-
-    # Task-wise comparison
-    plt.subplot(2, 2, 3)
-    task_comparison = (
-        grokking_df.groupby(["task_type", "optimizer_type"])["grokking_epoch"]
-        .mean()
-        .unstack()
+    plt.title(
+        "Distribution of Grokking Epochs for Muon and AdamW Optimizers",
+        fontsize=14,
     )
-    task_comparison.plot(kind="bar", ax=plt.gca())
-    plt.title("Grokking Epochs by Task")
-    plt.ylabel("Average Grokking Epoch")
-    plt.xlabel("Task Type")
-    plt.xticks(rotation=45)
-    plt.legend(title="Optimizer")
+    plt.ylabel("Grokking Epoch", fontsize=12)
+    plt.xlabel("Optimizer", fontsize=12)
 
-    # Softmax variant comparison
-    plt.subplot(2, 2, 4)
-    softmax_comparison = (
-        grokking_df.groupby(["softmax_variant", "optimizer_type"])[
-            "grokking_epoch"
-        ]
-        .mean()
-        .unstack()
+    # Add mean lines
+    muon_mean = grokking_df[grokking_df["optimizer_type"] == "muon"][
+        "grokking_epoch"
+    ].mean()
+    adamw_mean = grokking_df[grokking_df["optimizer_type"] == "adamw"][
+        "grokking_epoch"
+    ].mean()
+
+    plt.axhline(
+        y=muon_mean,
+        xmin=0,
+        xmax=0.5,
+        color="blue",
+        linestyle="--",
+        alpha=0.7,
+        label=f"Muon mean: {muon_mean:.1f}",
     )
-    softmax_comparison.plot(kind="bar", ax=plt.gca())
-    plt.title("Grokking Epochs by Softmax Variant")
-    plt.ylabel("Average Grokking Epoch")
-    plt.xlabel("Softmax Variant")
-    plt.xticks(rotation=45)
-    plt.legend(title="Optimizer")
+    plt.axhline(
+        y=adamw_mean,
+        xmin=0.5,
+        xmax=1,
+        color="red",
+        linestyle="--",
+        alpha=0.7,
+        label=f"AdamW mean: {adamw_mean:.1f}",
+    )
+
+    plt.legend()
+    plt.grid(True, alpha=0.3)
 
     plt.tight_layout()
     plt.savefig(
-        os.path.join(output_dir, "grokking_comparison.png"),
+        os.path.join(output_dir, "grokking_comparison_boxplot.png"),
         dpi=300,
         bbox_inches="tight",
     )
     plt.close()
 
-    # Print summary statistics
+    # Create violin plot for better distribution visualization
+    plt.figure(figsize=(10, 6))
+    sns.violinplot(data=grokking_df, x="optimizer_type", y="grokking_epoch")
+    plt.title("Distribution of Grokking Epochs (Violin Plot)", fontsize=14)
+    plt.ylabel("Grokking Epoch", fontsize=12)
+    plt.xlabel("Optimizer", fontsize=12)
+    plt.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(
+        os.path.join(output_dir, "grokking_comparison_violin.png"),
+        dpi=300,
+        bbox_inches="tight",
+    )
+    plt.close()
+
+    # Print summary statistics matching paper format
     print("\n" + "=" * 50)
     print("GROKKING COMPARISON SUMMARY")
     print("=" * 50)
@@ -90,19 +102,28 @@ def create_grokking_comparison_plot(
     ]
 
     if len(muon_grokking) > 0 and len(adamw_grokking) > 0:
-        print(
-            f"Muon average grokking epoch: {muon_grokking.mean():.2f} ± {muon_grokking.std():.2f}"
-        )
-        print(
-            f"AdamW average grokking epoch: {adamw_grokking.mean():.2f} ± {adamw_grokking.std():.2f}"
-        )
+        print(f"Muon average grokking epoch: {muon_grokking.mean():.2f}")
+        print(f"AdamW average grokking epoch: {adamw_grokking.mean():.2f}")
         print(f"Speedup: {adamw_grokking.mean() / muon_grokking.mean():.2f}x")
 
-        # Statistical test
+        # Statistical test matching paper methodology
         from scipy import stats
 
-        t_stat, p_value = stats.ttest_ind(muon_grokking, adamw_grokking)
+        t_stat, p_value = stats.ttest_ind(
+            muon_grokking, adamw_grokking, equal_var=False
+        )
         print(f"T-test: t={t_stat:.4f}, p={p_value:.2e}")
+
+        # Compare with paper results
+        print("\nComparison with Paper Results:")
+        print("Paper Muon mean:    102.89")
+        print(f"Our Muon mean:      {muon_grokking.mean():.2f}")
+        print("Paper AdamW mean:   153.09")
+        print(f"Our AdamW mean:     {adamw_grokking.mean():.2f}")
+        print("Paper t-statistic:  5.0175")
+        print(f"Our t-statistic:    {t_stat:.4f}")
+        print("Paper p-value:     6.33e-08")
+        print(f"Our p-value:        {p_value:.2e}")
 
     return grokking_df
 

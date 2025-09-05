@@ -334,16 +334,30 @@ class GrokkingTransformer(nn.Module):
         self.vocab_size = model_config.vocab_size
         self.softmax_variant = model_config.softmax_variant
 
-        # Embedding layer (identity embeddings as mentioned in paper)
+        # Identity embeddings as mentioned in paper (integer value itself used as embedding index)
+        # We'll implement this as a simple lookup table where token '42' maps to embedding vector 42
         self.embedding = nn.Embedding(
             model_config.vocab_size, model_config.hidden_size, padding_idx=0
         )
 
-        # Positional encoding
-        self.pos_embed = nn.Parameter(
-            torch.randn(1, model_config.max_seq_len, model_config.hidden_size)
-            * 0.02
-        )
+        # Initialize embeddings to identity-like behavior
+        with torch.no_grad():
+            # For numbers, set embedding to be close to the number itself
+            special_tokens_count = 12  # Based on dataset.py special tokens
+            for i in range(special_tokens_count, model_config.vocab_size):
+                number_value = i - special_tokens_count
+                if number_value < model_config.hidden_size:
+                    # Use one-hot-like initialization for small numbers
+                    self.embedding.weight[i, number_value] = 1.0
+                else:
+                    # For larger numbers, use scaled identity
+                    scale = number_value / model_config.hidden_size
+                    self.embedding.weight[i] = (
+                        torch.randn(model_config.hidden_size) * 0.1 + scale
+                    )
+
+        # Positional encoding (RoPE is applied in attention, not here)
+        # Remove the learned positional embeddings since we use RoPE
 
         # Transformer blocks
         self.blocks = nn.ModuleList(
@@ -408,7 +422,7 @@ class GrokkingTransformer(nn.Module):
             batch_size, seq_len = x.shape
             # Embeddings
             embedded = self.embedding(x)
-            embedded = embedded + self.pos_embed[:, :seq_len, :]
+            # No positional embedding addition since we use RoPE in attention
 
         # Apply transformer blocks
         for block in self.blocks:
@@ -443,7 +457,10 @@ class SoftmaxVariants:
         logits: torch.Tensor, temperature: float = 1.0
     ) -> torch.Tensor:
         """
-        Stablemax variant for numerical stability
+        Stablemax variant for numerical stability as described in the paper
+
+        Formula: s(z_i) = {z_i + 1 if z_i >= 0, 1/(1-z_i) if z_i < 0}
+        stablemax(z)_i = s(z_i) / sum_j s(z_j)
 
         Args:
             logits: Input logits
@@ -465,7 +482,8 @@ class SoftmaxVariants:
             """
             return torch.where(z >= 0, z + 1, 1 / (1 - z))
 
-        transformed = stable_transform(logits / temperature)
+        z = logits / temperature
+        transformed = stable_transform(z)
         return transformed / transformed.sum(dim=-1, keepdim=True)
 
     @staticmethod
@@ -473,7 +491,10 @@ class SoftmaxVariants:
         logits: torch.Tensor, temperature: float = 1.0
     ) -> torch.Tensor:
         """
-        Sparsemax variant that projects onto probability simplex
+        Sparsemax variant that projects onto probability simplex as described in the paper
+
+        Formula: sparsemax(z)_i = max{z_i - tau, 0}
+        where tau is found such that sum_i max{z_i - tau, 0} = 1
 
         Args:
             logits: Input logits
@@ -482,23 +503,22 @@ class SoftmaxVariants:
         Returns:
             Sparse probability distribution
         """
-        # Proper sparsemax implementation as described in the paper
         z = logits / temperature
-
-        # Sort logits in descending order
         z_sorted, _ = torch.sort(z, dim=-1, descending=True)
 
-        # Find the threshold tau
+        # Find the threshold tau using the efficient algorithm
         cumsum = torch.cumsum(z_sorted, dim=-1)
-        range_vals = torch.arange(1, z_sorted.shape[-1] + 1, device=z.device)
-        threshold = z_sorted - (cumsum - 1) / range_vals
+        range_vals = torch.arange(
+            1, z_sorted.shape[-1] + 1, device=z.device, dtype=z.dtype
+        )
 
-        # Find the largest index where threshold > 0
+        # Find k (number of active elements)
+        threshold = z_sorted - (cumsum - 1) / range_vals
         valid = threshold > 0
         k = torch.sum(valid, dim=-1, keepdim=True)
 
         # Compute tau
         tau = (torch.sum(z_sorted * valid, dim=-1, keepdim=True) - 1) / k
 
-        # Apply sparsemax transformation
+        # Apply sparsemax transformation: max{z - tau, 0}
         return torch.clamp(z - tau, min=0)

@@ -300,15 +300,30 @@ def create_dataloader(
 
 
 def get_task_configs() -> dict[str, dict[str, Union[int, float]]]:
-    """Get task configurations as described in the paper"""
+    """Get task configurations as described in the paper (Figure 2)"""
     return {
-        "gcd": {"modulus": 97, "train_split": 0.5},
-        "add": {"modulus": 97, "train_split": 0.8},
-        "div": {"modulus": 97, "train_split": 0.8},
-        "exp": {"modulus": 97, "train_split": 0.7},
-        "mul": {"modulus": 97, "train_split": 0.5},
+        "gcd": {
+            "modulus": 97,
+            "train_split": 0.5,
+        },  # Greatest common divisor, mod 97, 50% train split
+        "add": {
+            "modulus": 97,
+            "train_split": 0.8,
+        },  # Addition, mod 97, 80% train split
+        "div": {
+            "modulus": 97,
+            "train_split": 0.8,
+        },  # Division, mod 97, 80% train split
+        "exp": {
+            "modulus": 97,
+            "train_split": 0.7,
+        },  # Exponentiation, mod 97, 70% train split
+        "mul": {
+            "modulus": 97,
+            "train_split": 0.5,
+        },  # Multiplication, mod 97, 50% train split
         "parity": {
-            "modulus": 1024,  # Use full 10-bit range
-            "train_split": 0.5,  # Standard train split
+            "modulus": 1024,  # Parity of a 10-bit number, 1024 rows
+            "train_split": 0.5,  # 50% train split
         },
     }
