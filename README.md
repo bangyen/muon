@@ -260,7 +260,7 @@ Contributions are welcome! Areas for improvement:
 - **Performance**: Optimize for larger models
 - **Analysis**: Additional ablation studies
 - **Documentation**: More detailed explanations
-- **Visualization**: Interactive plots and dashboards
+- **Testing**: Expand test coverage and edge cases
 
 ## 📄 License
 
