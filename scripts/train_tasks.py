@@ -7,6 +7,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import torch
+from muon import SingleDeviceMuonWithAuxAdam
 from torch import nn, optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -17,7 +18,6 @@ from src.dataset import (
     get_task_configs,
 )
 from src.model import GrokkingTransformer, ModelConfig, SoftmaxVariants
-from src.optimizer import MuonOptimizer, OptimizerConfig
 
 
 @dataclass
@@ -287,20 +287,29 @@ def run_experiment(config: ExperimentConfig) -> dict:
 
     # Create optimizer
     if config.optimizer_type == "muon":
-        optimizer = MuonOptimizer(
-            model.parameters(),
-            OptimizerConfig(
+        # Use original Muon implementation with proper parameter grouping
+        # Hidden weights (2D+ parameters) use Muon, others use AdamW
+        hidden_weights = [p for p in model.parameters() if p.ndim >= 2]
+        other_params = [p for p in model.parameters() if p.ndim < 2]
+
+        param_groups = [
+            dict(
+                params=hidden_weights,
+                use_muon=True,
                 lr=config.optimizer_config["lr"],
+                momentum=0.95,  # Default Muon momentum
+                weight_decay=config.optimizer_config["weight_decay"],
+            ),
+            dict(
+                params=other_params,
+                use_muon=False,
+                lr=config.optimizer_config["lr"]
+                * 0.1,  # Lower LR for non-hidden params
                 betas=config.optimizer_config["betas"],
                 weight_decay=config.optimizer_config["weight_decay"],
-                spectral_norm_strength=config.optimizer_config[
-                    "spectral_norm_strength"
-                ],
-                second_order_interval=config.optimizer_config[
-                    "second_order_interval"
-                ],
             ),
-        )
+        ]
+        optimizer = SingleDeviceMuonWithAuxAdam(param_groups)
     else:  # AdamW
         optimizer = optim.AdamW(
             model.parameters(),
@@ -371,12 +380,9 @@ def run_comprehensive_experiments(
 
     # Optimizer configurations - based on paper findings
     muon_config = {
-        "lr": 1e-3,  # Slightly higher learning rate for Muon as per paper
-        "betas": (0.9, 0.98),
-        "weight_decay": 1e-2,  # Lower weight decay for Muon (spectral norm helps)
-        "spectral_norm_strength": 0.1,  # Enable spectral norm constraint (key Muon feature)
-        "second_order_interval": 1,  # Update every step for better second-order info
-        "use_orthogonal_updates": True,  # Enable orthogonal updates (key Muon feature)
+        "lr": 0.02,  # Original Muon default learning rate
+        "betas": (0.9, 0.95),  # For non-hidden parameters
+        "weight_decay": 1e-2,  # Weight decay for both groups
     }
 
     adamw_config = {
