@@ -480,29 +480,34 @@ def run_comprehensive_experiments(
                 if r["grokking_epoch"] is not None
             ]
 
-            muon_success_rate = len(muon_grokking) / len(muon_results) * 100
-            adamw_success_rate = len(adamw_grokking) / len(adamw_results) * 100
+            muon_success = len(muon_grokking) / len(muon_results) * 100
+            adamw_success = len(adamw_grokking) / len(adamw_results) * 100
+            muon_avg = sum(muon_grokking) / (len(muon_grokking) or 1)
+            adamw_avg = sum(adamw_grokking) / (len(adamw_grokking) or 1)
+            muon_epochs = ", ".join(map(str, muon_grokking))
+            adamw_epochs = ", ".join(map(str, adamw_grokking))
+            speedup = adamw_avg / muon_avg if muon_avg else 0
 
             # Add summary data
             summary_results.append(
                 {
                     "Task": task_type.upper(),
                     "Softmax": softmax_variant.upper(),
-                    "Muon Success Rate": f"{muon_success_rate:.0f}%",
-                    "Muon Avg Epochs": f"{sum(muon_grokking) / len(muon_grokking):.1f}"
+                    "Muon Success Rate": f"{muon_success:.0f}%",
+                    "Muon Avg Epochs": f"{muon_avg:.1f}"
                     if muon_grokking
                     else "N/A",
-                    "Muon Grokking Epochs": f"[{', '.join(map(str, muon_grokking))}]"
+                    "Muon Grokking Epochs": f"[{muon_epochs}]"
                     if muon_grokking
                     else "None",
-                    "AdamW Success Rate": f"{adamw_success_rate:.0f}%",
-                    "AdamW Avg Epochs": f"{sum(adamw_grokking) / len(adamw_grokking):.1f}"
+                    "AdamW Success Rate": f"{adamw_success:.0f}%",
+                    "AdamW Avg Epochs": f"{adamw_avg:.1f}"
                     if adamw_grokking
                     else "N/A",
-                    "AdamW Grokking Epochs": f"[{', '.join(map(str, adamw_grokking))}]"
+                    "AdamW Grokking Epochs": f"[{adamw_epochs}]"
                     if adamw_grokking
                     else "None",
-                    "Speedup": f"{sum(adamw_grokking) / len(adamw_grokking) / (sum(muon_grokking) / len(muon_grokking)):.1f}x"
+                    "Speedup": f"{speedup:.1f}x"
                     if muon_grokking and adamw_grokking
                     else "N/A",
                 }
