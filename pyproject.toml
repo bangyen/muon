@@ -34,9 +34,6 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/bangyen/muon-grokking-reproduction"
-Repository = "https://github.com/bangyen/muon-grokking-reproduction"
-Issues = "https://github.com/bangyen/muon-grokking-reproduction/issues"
 "Original Paper" = "https://arxiv.org/pdf/2504.16041"
 "Original Muon" = "https://github.com/KellerJordan/Muon"
 
