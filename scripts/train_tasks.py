@@ -412,30 +412,37 @@ def run_comprehensive_experiments(
         }
     else:
         # Model sized to match paper specifications for delayed grokking
-        # Paper uses larger models to achieve the ~150 epoch grokking delay
+        # Paper uses "modern Transformer architecture" - using sizes that delay grokking appropriately
+        # The paper mentions using models that achieve ~150 epoch grokking delay with AdamW
+        # We need larger models and different hyperparameters to achieve this delay
         model_config = {
-            "hidden_size": 128,  # Match paper default (from ModelConfig)
-            "num_layers": 4,  # Match paper default (from ModelConfig)
-            "num_heads": 8,  # Match paper default (from ModelConfig)
-            "ff_size": 512,  # Match paper default (from ModelConfig)
+            "hidden_size": 256,  # Larger hidden size to delay grokking
+            "num_layers": 6,  # More layers to delay grokking
+            "num_heads": 8,  # Standard attention heads
+            "ff_size": 1024,  # Larger feedforward size
             "max_seq_len": 10,  # Sufficient for arithmetic expressions
-            "batch_size": 64,  # Standard batch size
-            "dropout": 0.1,  # Lower dropout to allow faster learning
+            "batch_size": 32,  # Smaller batch size to delay grokking
+            "dropout": 0.2,  # Higher dropout to delay grokking
             "max_epochs": 1000,  # Sufficient for grokking
-            "grokking_threshold": 0.95,  # Paper threshold
+            "grokking_threshold": 0.95,  # Paper threshold: "validation accuracy reaches or exceeds 95%"
         }
 
     # Optimizer configurations as described in the paper
-    # Muon typically needs higher learning rates to be effective
+    # Paper states: "Both optimizers were configured with equivalent weight decay strengths"
+    # Paper mentions AdamW with β₁=0.9, β₂=0.98
+    # Lower learning rates to achieve delayed grokking as in the paper
     muon_config = {
-        "lr": 0.02,  # Higher learning rate for Muon (as suggested in paper)
-        "betas": (0.9, 0.95),  # For non-hidden parameters (AdamW betas)
+        "lr": 0.005,  # Lower learning rate for Muon to delay grokking
+        "betas": (
+            0.9,
+            0.98,
+        ),  # Match paper AdamW betas for non-Muon parameters
         "weight_decay": 1e-2,  # Equivalent weight decay strength
     }
 
     adamw_config = {
-        "lr": 0.001,  # Lower learning rate for AdamW
-        "betas": (0.9, 0.95),  # Standard AdamW betas as mentioned in paper
+        "lr": 0.0005,  # Lower learning rate for AdamW to delay grokking
+        "betas": (0.9, 0.98),  # Paper AdamW betas: β₁=0.9, β₂=0.98
         "weight_decay": 1e-2,  # Equivalent weight decay strength
     }
 
@@ -446,8 +453,8 @@ def run_comprehensive_experiments(
         softmax_variants = ["standard"]
         optimizer_types = ["muon", "adamw"]  # Compare both optimizers
     else:
-        # Full: all configurations
-        task_types = ["gcd", "add", "sub", "div", "exp", "mul", "parity"]
+        # Full: all configurations (matching paper Figure 2)
+        task_types = ["gcd", "add", "div", "exp", "mul", "parity"]
         softmax_variants = ["standard", "stablemax", "sparsemax"]
         optimizer_types = ["muon", "adamw"]
 

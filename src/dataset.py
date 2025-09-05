@@ -49,7 +49,6 @@ class ModularArithmeticDataset(Dataset[dict[str, Union[torch.Tensor, int]]]):
 
         if config.task_type not in [
             "add",
-            "sub",
             "mul",
             "div",
             "exp",
@@ -98,12 +97,6 @@ class ModularArithmeticDataset(Dataset[dict[str, Union[torch.Tensor, int]]]):
             for a in range(self.modulus):
                 for b in range(self.modulus):
                     result = (a + b) % self.modulus
-                    data.append((a, b, result))
-
-        elif self.task_type == "sub":
-            for a in range(self.modulus):
-                for b in range(self.modulus):
-                    result = (a - b) % self.modulus
                     data.append((a, b, result))
 
         elif self.task_type == "mul":
@@ -318,23 +311,19 @@ def get_task_configs() -> dict[str, dict[str, Union[int, float]]]:
         "add": {
             "modulus": 97,
             "train_split": 0.8,
-        },  # Addition, mod 97, 80% train split
-        "sub": {
-            "modulus": 97,
-            "train_split": 0.8,
-        },  # Subtraction, mod 97, 80% train split
+        },  # Addition, mod 97, 80% train split (Mod-add in paper)
         "div": {
             "modulus": 97,
             "train_split": 0.8,
-        },  # Division, mod 97, 80% train split
+        },  # Division, mod 97, 80% train split (Mod-div in paper)
         "exp": {
             "modulus": 97,
             "train_split": 0.7,
-        },  # Exponentiation, mod 97, 70% train split
+        },  # Exponentiation, mod 97, 70% train split (Mod-exp in paper)
         "mul": {
             "modulus": 97,
             "train_split": 0.5,
-        },  # Multiplication, mod 97, 50% train split
+        },  # Multiplication, mod 97, 50% train split (Mod-mul in paper)
         "parity": {
             "modulus": 1024,  # Parity of a 10-bit number, 1024 rows
             "train_split": 0.5,  # 50% train split

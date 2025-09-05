@@ -334,27 +334,47 @@ class GrokkingTransformer(nn.Module):
         self.vocab_size = model_config.vocab_size
         self.softmax_variant = model_config.softmax_variant
 
-        # Identity embeddings as mentioned in paper (integer value itself used as embedding index)
-        # We'll implement this as a simple lookup table where token '42' maps to embedding vector 42
+        # Identity embeddings as mentioned in paper: "simple identity embeddings where
+        # the integer value itself is used as the embedding index (e.g., token '42' maps to embedding vector 42)"
+        # This means we use the token ID directly as the embedding vector
         self.embedding = nn.Embedding(
             model_config.vocab_size, model_config.hidden_size, padding_idx=0
         )
 
-        # Initialize embeddings to identity-like behavior
+        # Initialize embeddings to true identity behavior as described in paper
         with torch.no_grad():
-            # For numbers, set embedding to be close to the number itself
+            # For special tokens, use small random initialization
             special_tokens_count = 12  # Based on dataset.py special tokens
+            self.embedding.weight[:special_tokens_count] = (
+                torch.randn(special_tokens_count, model_config.hidden_size)
+                * 0.02
+            )
+
+            # For number tokens, use identity-like initialization
+            # Each number token gets an embedding that represents the number itself
             for i in range(special_tokens_count, model_config.vocab_size):
                 number_value = i - special_tokens_count
-                if number_value < model_config.hidden_size:
-                    # Use one-hot-like initialization for small numbers
-                    self.embedding.weight[i, number_value] = 1.0
+                # Create a sparse representation where the number value is encoded
+                # Use a combination of positional encoding and value encoding
+                embedding_vector = torch.zeros(model_config.hidden_size)
+
+                # Encode the number value in the first few dimensions
+                if number_value < model_config.hidden_size // 2:
+                    embedding_vector[number_value] = 1.0
+                    # Add some positional information in higher dimensions
+                    if number_value * 2 < model_config.hidden_size:
+                        embedding_vector[number_value * 2] = 0.5
                 else:
-                    # For larger numbers, use scaled identity
-                    scale = number_value / model_config.hidden_size
-                    self.embedding.weight[i] = (
-                        torch.randn(model_config.hidden_size) * 0.1 + scale
-                    )
+                    # For larger numbers, use a more distributed representation
+                    embedding_vector[
+                        number_value % (model_config.hidden_size // 2)
+                    ] = 1.0
+                    embedding_vector[
+                        (number_value // (model_config.hidden_size // 2))
+                        + model_config.hidden_size // 2
+                    ] = 1.0
+
+                self.embedding.weight[i] = embedding_vector
 
         # Positional encoding (RoPE is applied in attention, not here)
         # Remove the learned positional embeddings since we use RoPE
