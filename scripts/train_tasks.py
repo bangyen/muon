@@ -654,10 +654,10 @@ def main():
             ["Metric", "Muon", "AdamW"],
             [
                 "Success Rate",
-                f"{sum(muon_success_rates)/len(muon_success_rates):.0f}%"
+                f"{sum(muon_success_rates) / len(muon_success_rates):.0f}%"
                 if muon_success_rates
                 else "N/A",
-                f"{sum(adamw_success_rates)/len(adamw_success_rates):.0f}%"
+                f"{sum(adamw_success_rates) / len(adamw_success_rates):.0f}%"
                 if adamw_success_rates
                 else "N/A",
             ],
@@ -721,10 +721,10 @@ def main():
             ["Metric", "Muon", "AdamW"],
             [
                 "Success Rate",
-                f"{sum(all_muon_success)/len(all_muon_success):.0f}%"
+                f"{sum(all_muon_success) / len(all_muon_success):.0f}%"
                 if all_muon_success
                 else "N/A",
-                f"{sum(all_adamw_success)/len(all_adamw_success):.0f}%"
+                f"{sum(all_adamw_success) / len(all_adamw_success):.0f}%"
                 if all_adamw_success
                 else "N/A",
             ],
