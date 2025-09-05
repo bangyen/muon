@@ -182,6 +182,9 @@ class GrokkingTrainer:
                 and self.grokking_epoch is None
             ):
                 self.grokking_epoch = epoch
+                # Complete progress bar and break
+                pbar.total = epoch
+                pbar.refresh()
                 break
 
             if val_acc > best_val_acc:
@@ -191,6 +194,9 @@ class GrokkingTrainer:
                 patience_counter += 1
 
             if patience_counter >= patience:
+                # Complete progress bar and break
+                pbar.total = epoch
+                pbar.refresh()
                 break
 
         return {
