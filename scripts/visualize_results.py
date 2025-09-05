@@ -1,10 +1,16 @@
 import argparse
 import json
 import os
+import warnings
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+
+# Suppress scipy precision warnings for statistical tests
+warnings.filterwarnings(
+    "ignore", category=RuntimeWarning, module="scipy.stats"
+)
 
 
 def create_grokking_comparison_plot(

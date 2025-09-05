@@ -1,4 +1,4 @@
-.PHONY: help install install-prod install-dev test test-quick lint format clean run-experiments visualize setup-dev build publish
+.PHONY: help install install-dev test lint format clean run-experiments run-single visualize analyze setup-dev build publish
 
 help: ## Show this help message
 	@echo "Muon Optimizer: Accelerating Grokking Reproduction"
@@ -7,10 +7,7 @@ help: ## Show this help message
 	@echo "Available commands:"
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-install: ## Install all dependencies (including dev)
-	pip install -e ".[dev]"
-
-install-prod: ## Install production dependencies only
+install: ## Install production dependencies only
 	pip install -e .
 
 install-dev: ## Install development dependencies
@@ -19,14 +16,11 @@ install-dev: ## Install development dependencies
 test: ## Run tests
 	python -m pytest tests/ -v
 
-test-quick: ## Run quick single task test
-	python -m scripts.train_tasks --single_task --device cpu
-
 lint: ## Run linting checks
 	ruff check src/ scripts/
 	ruff format --check src/ scripts/
-	mypy src/
 	interrogate src/ --fail-under=90
+	mypy src/
 
 format: ## Format code with ruff
 	ruff format src/ scripts/
@@ -45,16 +39,18 @@ clean: ## Clean up generated files
 	find . -name "__pycache__" -delete
 
 run-experiments: ## Run comprehensive experiments
-	python -m scripts.train_tasks --device cpu --num_runs 3
+	python -m scripts.train_tasks --device cpu
+
+run-single: ## Run quick single task test
+	python -m scripts.train_tasks --single_task --device cpu
+
+LATEST_RESULTS = $(shell ls -t results/experiment_results_*.json | head -1)
 
 visualize: ## Create visualizations from results
-	python -m scripts.visualize_results --results_file results/experiment_results_*.json
+	python -m scripts.visualize_results --results_file $(LATEST_RESULTS)
+
+analyze: ## Analyze experiment results with statistical tests
+	python -m scripts.analyze_results --results_file $(LATEST_RESULTS) --detailed
 
 setup-dev: install-dev ## Setup development environment
 	pre-commit install
-
-build: ## Build package
-	python -m build
-
-publish: build ## Build and publish to PyPI
-	twine upload dist/*

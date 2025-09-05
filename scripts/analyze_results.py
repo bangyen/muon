@@ -6,11 +6,17 @@ Performs t-test analysis comparing Muon vs AdamW grokking epochs
 
 import argparse
 import json
+import warnings
 from typing import Any
 
 import numpy as np
 import pandas as pd
 from scipy import stats
+
+# Suppress scipy precision warnings for statistical tests
+warnings.filterwarnings(
+    "ignore", category=RuntimeWarning, module="scipy.stats"
+)
 
 
 def load_results(results_file: str) -> list[dict[str, Any]]:
@@ -87,7 +93,7 @@ def analyze_grokking_results(results: list[dict[str, Any]]) -> dict[str, Any]:
             "p_value": p_value,
             "cohens_d": cohens_d,
             "speedup": speedup,
-            "significant": p_value < 0.05,
+            "significant": bool(p_value < 0.05),
         },
     }
 
