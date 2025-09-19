@@ -20,7 +20,7 @@ This repository contains a reproduction of the paper **"Muon Optimizer Accelerat
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/bangyen/muon.git
 cd muon
 
 # Activate virtual environment
