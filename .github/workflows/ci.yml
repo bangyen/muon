@@ -87,11 +87,4 @@ jobs:
       if: always()
       run: |
         echo "=== Smoke Test Results ==="
-        if [ -f results/experiment_summary_*.csv ]; then
-          echo "CSV Summary:"
-          cat results/experiment_summary_*.csv
-        fi
-        if [ -f results/experiment_results_*.json ]; then
-          echo "JSON Results:"
-          python -c "import json; import glob; files = glob.glob('results/experiment_results_*.json'); [print(f'Task: {result[\"task_type\"]}, Optimizer: {result[\"optimizer_type\"]}, Grokking Epoch: {result[\"grokking_epoch\"]}, Final Val Acc: {result[\"final_val_acc\"]:.3f}') for result in json.load(open(files[0])) if files]"
-        fi
+        python -m scripts.display_results
