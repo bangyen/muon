@@ -44,6 +44,9 @@ run-experiments: ## Run comprehensive experiments
 run-single: ## Run quick single task test
 	python -m scripts.train_tasks --single_task --device cpu
 
+smoke-test: ## Run CI smoke test (≤2 minutes)
+	python -m scripts.smoke_test --timeout 120
+
 LATEST_RESULTS = $(shell ls -t results/experiment_results_*.json | head -1)
 
 analyze: ## Analyze experiment results with statistical tests

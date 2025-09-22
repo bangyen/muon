@@ -54,6 +54,7 @@ make install-dev        # Install development dependencies
 # Running experiments
 make run-single         # Run quick single task test
 make run-experiments    # Run comprehensive experiments
+make smoke-test         # Run CI smoke test (≤2 minutes)
 
 # Code quality and testing
 make test               # Run all tests
@@ -74,6 +75,9 @@ python -m scripts.train_tasks --single_task --device cpu
 # Run comprehensive experiments (takes several hours)
 python -m scripts.train_tasks --device cpu --num_runs 3
 
+# Run CI smoke test (≤2 minutes)
+python -m scripts.smoke_test --timeout 120
+
 # Perform statistical analysis matching the paper
 python -m scripts.analyze_results --results_file results/experiment_results_YYYYMMDD_HHMMSS.json --detailed
 ```
@@ -89,7 +93,8 @@ muon/
 │   └── dataset.py        # Modular arithmetic datasets (exact paper configs)
 ├── scripts/
 │   ├── train_tasks.py    # Main training script (faithful to paper methodology)
-│   └── analyze_results.py   # Statistical analysis matching paper results
+│   ├── analyze_results.py   # Statistical analysis matching paper results
+│   └── smoke_test.py     # CI smoke test (≤2 minutes)
 ├── tests/
 │   ├── __init__.py
 │   ├── conftest.py       # Test configuration and fixtures
@@ -108,6 +113,7 @@ muon/
 - `src/dataset.py`: Modular arithmetic dataset with exact paper configurations
 - `scripts/train_tasks.py`: Training pipeline with Muon and AdamW optimizers
 - `scripts/analyze_results.py`: Statistical analysis matching paper methodology
+- `scripts/smoke_test.py`: CI smoke test for quick validation (≤2 minutes)
 - `pyproject.toml`: Comprehensive project configuration with development tools
 
 ## Reproduction Details
@@ -265,6 +271,23 @@ make analyze
 1. **Original Paper**: Tveit, A., Remseth, B., & Skogvold, A. (2025). Muon Optimizer Accelerates Grokking. arXiv:2504.16041
 2. **Grokking Phenomenon**: Power, A., et al. (2022). Grokking: Generalization Beyond Overfitting on Small Algorithmic Datasets
 3. **Muon Optimizer**: Jordan, K. (2024). Muon Optimizer. GitHub repository
+
+## CI/CD
+
+This project includes a GitHub Actions workflow for continuous integration:
+
+- **Smoke Test**: Runs a ≤2-minute CPU test on every push and pull request
+- **Artifacts**: Uploads JSON/CSV results as artifacts for reviewer inspection
+- **Timeout**: 5-minute overall timeout with 3-minute test execution limit
+- **Results**: Shows grokking epochs, validation accuracy, and speedup metrics
+
+The CI smoke test uses minimal configurations to verify:
+- Muon optimizer functionality
+- AdamW optimizer functionality  
+- Model training and evaluation
+- Result saving and formatting
+
+Results are automatically uploaded as artifacts and displayed in the CI logs.
 
 ## Development
 

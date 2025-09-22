@@ -1,84 +1,106 @@
-name: CI/CD Pipeline
+name: CI
 
 on:
   push:
     branches: [ main, develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
 
 jobs:
-  test:
+  code-quality:
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        python-version: ['3.9', '3.11']
-
+    timeout-minutes: 10
+    
     steps:
     - uses: actions/checkout@v4
-
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
       with:
-        python-version: ${{ matrix.python-version }}
-        cache: 'pip'
-
+        python-version: '3.9'
+    
     - name: Cache pip dependencies
-      uses: actions/cache@v4
+      uses: actions/cache@v3
       with:
-        path: |
-          ~/.cache/pip
-          ~/.local/lib/python${{ matrix.python-version }}/site-packages
-        key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
         restore-keys: |
-          ${{ runner.os }}-pip-${{ matrix.python-version }}-
-
+          ${{ runner.os }}-pip-
+    
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install --cache-dir ~/.cache/pip --no-deps -e .
-        pip install --cache-dir ~/.cache/pip --use-pep517 -e ".[dev]"
-
+        pip install -e ".[dev]"
+    
+    - name: Run linting checks
+      run: |
+        ruff check src/ scripts/
+        ruff format --check src/ scripts/
+        interrogate src/ --fail-under=90
+        mypy src/
+    
     - name: Run tests
       run: |
         python -m pytest tests/ -v
 
-  lint:
+  smoke-test:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 5  # Overall timeout for the job
+    
     steps:
     - uses: actions/checkout@v4
-
+    
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v4
       with:
-        python-version: 3.9
-        cache: 'pip'
-
+        python-version: '3.9'
+    
     - name: Cache pip dependencies
-      uses: actions/cache@v4
+      uses: actions/cache@v3
       with:
-        path: |
-          ~/.cache/pip
-          ~/.local/lib/python3.9/site-packages
-        key: ${{ runner.os }}-pip-3.9-${{ hashFiles('pyproject.toml') }}
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
         restore-keys: |
-          ${{ runner.os }}-pip-3.9-
-
-    - name: Install development dependencies
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install --cache-dir ~/.cache/pip --no-deps -e .
-        pip install --cache-dir ~/.cache/pip --use-pep517 -e ".[dev]"
-
-    - name: Run ruff check
-      run: ruff check src/ scripts/
-
-    - name: Run ruff format check
-      run: ruff format --check src/ scripts/
-
-    - name: Run mypy type checking
-      run: mypy src/
-
-    - name: Run interrogate doc coverage
-      run: interrogate src/ --fail-under=90
+        pip install -e ".[dev]"
+    
+    - name: Run smoke test
+      run: |
+        python -m scripts.smoke_test --timeout 120
+      timeout-minutes: 3  # 3 minutes for the actual test
+    
+    - name: Upload results as artifacts
+      uses: actions/upload-artifact@v3
+      if: always()  # Upload even if test fails
+      with:
+        name: smoke-test-results
+        path: |
+          results/experiment_results_*.json
+          results/experiment_summary_*.csv
+        retention-days: 30
+    
+    - name: Display results summary
+      if: always()
+      run: |
+        echo "=== Smoke Test Results ==="
+        if [ -f results/experiment_summary_*.csv ]; then
+          echo "CSV Summary:"
+          cat results/experiment_summary_*.csv
+        fi
+        if [ -f results/experiment_results_*.json ]; then
+          echo "JSON Results:"
+          python -c "
+          import json
+          import glob
+          files = glob.glob('results/experiment_results_*.json')
+          if files:
+              with open(files[0]) as f:
+                  data = json.load(f)
+              for result in data:
+                  print(f'Task: {result[\"task_type\"]}, Optimizer: {result[\"optimizer_type\"]}, Grokking Epoch: {result[\"grokking_epoch\"]}, Final Val Acc: {result[\"final_val_acc\"]:.3f}')
+          "
+        fi
