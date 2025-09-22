@@ -93,14 +93,5 @@ jobs:
         fi
         if [ -f results/experiment_results_*.json ]; then
           echo "JSON Results:"
-          python -c "
-import json
-import glob
-files = glob.glob('results/experiment_results_*.json')
-if files:
-    with open(files[0]) as f:
-        data = json.load(f)
-    for result in data:
-        print(f'Task: {result[\"task_type\"]}, Optimizer: {result[\"optimizer_type\"]}, Grokking Epoch: {result[\"grokking_epoch\"]}, Final Val Acc: {result[\"final_val_acc\"]:.3f}')
-"
+          python -c "import json; import glob; files = glob.glob('results/experiment_results_*.json'); [print(f'Task: {result[\"task_type\"]}, Optimizer: {result[\"optimizer_type\"]}, Grokking Epoch: {result[\"grokking_epoch\"]}, Final Val Acc: {result[\"final_val_acc\"]:.3f}') for result in json.load(open(files[0])) if files]"
         fi
