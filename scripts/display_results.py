@@ -7,33 +7,31 @@ in a clean, readable format without YAML parsing issues.
 """
 
 import json
-import glob
-import sys
 from pathlib import Path
 
 
 def display_results():
     """Display smoke test results from JSON and CSV files."""
     results_dir = Path("results")
-    
+
     if not results_dir.exists():
         print("No results directory found")
         return
-    
+
     # Display CSV summary
     csv_files = list(results_dir.glob("experiment_summary_*.csv"))
     if csv_files:
         print("CSV Summary:")
         with open(csv_files[0]) as f:
             print(f.read())
-    
+
     # Display JSON results
     json_files = list(results_dir.glob("experiment_results_*.json"))
     if json_files:
         print("JSON Results:")
         with open(json_files[0]) as f:
             data = json.load(f)
-        
+
         for result in data:
             print(
                 f"Task: {result['task_type']}, "
