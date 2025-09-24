@@ -168,9 +168,9 @@ class TestModularArithmeticDataset:
 
             for _i, (a, b, result) in enumerate(dataset.data[:100]):
                 expected = expected_func(a, b)
-                assert (
-                    result == expected
-                ), f"Task {task_type}: {a} op {b} = {result}, expected {expected}"
+                assert result == expected, (
+                    f"Task {task_type}: {a} op {b} = {result}, expected {expected}"
+                )
 
     def test_parity_task(self):
         """Test parity task specifically"""
@@ -183,9 +183,9 @@ class TestModularArithmeticDataset:
         for _i, (num, _, parity) in enumerate(dataset.data[:100]):
             binary_str = format(num, "010b")
             expected_parity = sum(int(bit) for bit in binary_str) % 2
-            assert (
-                parity == expected_parity
-            ), f"Parity mismatch for {num} (binary: {binary_str})"
+            assert parity == expected_parity, (
+                f"Parity mismatch for {num} (binary: {binary_str})"
+            )
 
     def test_gcd_task(self):
         """Test GCD task specifically"""
@@ -195,9 +195,9 @@ class TestModularArithmeticDataset:
 
         for _i, (a, b, result) in enumerate(dataset.data[:100]):
             expected_gcd = dataset._gcd(a, b)
-            assert (
-                result == expected_gcd
-            ), f"GCD mismatch: gcd({a}, {b}) = {result}, expected {expected_gcd}"
+            assert result == expected_gcd, (
+                f"GCD mismatch: gcd({a}, {b}) = {result}, expected {expected_gcd}"
+            )
 
     def test_division_task(self):
         """Test division task specifically"""
@@ -208,9 +208,9 @@ class TestModularArithmeticDataset:
         for _i, (a, b, result) in enumerate(dataset.data[:100]):
             if b != 0:
                 check_result = (result * b) % dataset.modulus
-                assert (
-                    check_result == a
-                ), f"Division check failed: {result} * {b} ≡ {check_result} (mod {dataset.modulus}), expected {a}"
+                assert check_result == a, (
+                    f"Division check failed: {result} * {b} ≡ {check_result} (mod {dataset.modulus}), expected {a}"
+                )
 
     def test_sequence_length_handling(self):
         """Test handling of different sequence lengths"""
