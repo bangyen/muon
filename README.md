@@ -1,11 +1,10 @@
 # Muon Optimizer: Accelerating Grokking Reproduction
 
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/bangyen/muon/blob/main/muon_demo.ipynb)  
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen)](tests/)  
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/bangyen/muon/blob/main/muon_demo.ipynb)
+[![Tests](https://img.shields.io/badge/tests-passing-brightgreen)](tests/)
 [![License](https://img.shields.io/github/license/bangyen/muon)](LICENSE)
 
-**Muon Optimizer accelerates grokking by 33%: reduces average grokking epoch from 153.09 to 102.89, with statistically significant improvements across 7 modular arithmetic tasks**  
-*(Faithful reproduction of "Muon Optimizer Accelerates Grokking" paper with spectral norm constraints, orthogonalized gradients, and second-order information)*
+**Muon Optimizer accelerates grokking by 33%: reduces average grokking epoch from 153.09 to 102.89, with statistically significant improvements across 7 modular arithmetic tasks**
 
 ## Quickstart
 
@@ -31,10 +30,10 @@ Or open in Colab: [Colab Notebook](https://colab.research.google.com/github/bang
 
 ## Features
 
-- **Spectral Norm Constraints** — improves optimization landscape for faster convergence.  
-- **Orthogonalized Gradients** — reduces interference between parameter updates for better learning dynamics.  
-- **Second-Order Information** — leverages curvature information for smarter parameter updates.  
-- **Faithful Reproduction** — exact implementation matching paper specifications with 4-layer transformer, RMSNorm, RoPE, and SiLU activation.  
+- **Spectral Norm Constraints** — improves optimization landscape for faster convergence.
+- **Orthogonalized Gradients** — reduces interference between parameter updates for better learning dynamics.
+- **Second-Order Information** — leverages curvature information for smarter parameter updates.
+- **Faithful Reproduction** — exact implementation matching paper specifications with 4-layer transformer, RMSNorm, RoPE, and SiLU activation.
 
 ## Repo Structure
 
@@ -49,11 +48,9 @@ muon/
 
 ## Validation
 
-- ✅ Full test coverage (`pytest`)  
-- ✅ Reproducible seeds for experiments  
-- ✅ Benchmark scripts included  
-- ✅ CI smoke test (≤2 minutes)  
-- ✅ Statistical analysis matching paper methodology  
+- ✅ Full test coverage (`pytest`)
+- ✅ Reproducible seeds for experiments
+- ✅ Benchmark scripts included
 
 ## References
 
