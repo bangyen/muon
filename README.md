@@ -4,7 +4,14 @@
 [![Tests](https://img.shields.io/badge/tests-passing-brightgreen)](tests/)
 [![License](https://img.shields.io/github/license/bangyen/muon)](LICENSE)
 
-**Muon Optimizer accelerates grokking by 33%: reduces average grokking epoch from 153.09 to 102.89, with statistically significant improvements across 7 modular arithmetic tasks**
+**Muon Optimizer accelerates grokking by 33%: reduces average grokking epoch from 153.09 to 102.89, with statistically significant improvements across 7 modular arithmetic tasks**  
+*(Results from original paper - Tveit et al., 2025)*
+
+<p align="center">
+  <img src="assets/preview.png" alt="Grokking epoch distribution comparison" width="600">
+</p>
+
+*Figure: Grokking epoch distribution comparison from the original paper (Tveit et al., 2025)*
 
 ## Quickstart
 
@@ -26,7 +33,7 @@ Or open in Colab: [Colab Notebook](https://colab.research.google.com/github/bang
 |--------------------|----------|--------------|---------------|
 | 7 Modular Arithmetic Tasks | 153.09 epochs | **102.89 epochs** | **33% faster** |
 
-*Statistical significance: t=5.0175, p=6.33e-08 across all tasks*
+*Statistical significance: t=5.0175, p=6.33e-08 across all tasks (from original paper)*
 
 ## Features
 
