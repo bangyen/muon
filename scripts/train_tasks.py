@@ -387,13 +387,13 @@ def run_comprehensive_experiments(
     else:
         model_config = {
             "hidden_size": 256,
-            "num_layers": 6,
+            "num_layers": 4,
             "num_heads": 8,
             "ff_size": 1024,
             "max_seq_len": 10,
             "batch_size": 32,
             "dropout": 0.2,
-            "max_epochs": 100,
+            "max_epochs": 500,
             "grokking_threshold": 0.95,
         }
 
